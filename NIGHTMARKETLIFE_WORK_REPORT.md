@@ -199,7 +199,7 @@ Storage Key 已版本化為 `nightMarketLife.characterSettings.v1`。白名單�
 
 ### Paper Doll Face / Clothes 相對位置修正
 
-Face 與 Clothes 採用 Character Preview 的統一 CSS 尺寸及定位，不依素材 ID 設定個別 offset。預覽容器的高寬比為 `1.35`，以容納完整的長身體。`face-layer` 寬度為容器的 `74%`，使用 `aspect-ratio: 1` 維持 1:1 正圓，垂直定位為 `top: 7%`，並以 `left: 50%` 搭配 `translateX(-50%)` 水平置中、`z-index: 2` 顯示在前方。`clothes-layer` 寬度為容器的 `65%`，使用 `aspect-ratio: 325 / 448`（Body 高度約為寬度的 1.3785 倍）；此組比例只增加 Body 寬度，實際高度仍維持原規格的約 89.6% 容器寬度。Body 垂直定位維持 `top: 32%`，同樣水平置中並以 `z-index: 1` 顯示在後方；Clothes 圖片統一填滿此窄長 Layer。Body 上端持續伸入 Face 後方，且上方圓角與領口透明區由頭部完整遮住。`accessory-layer` 維持 `z-index: 3`。`FACE_ASSETS`、`DEFAULT_CLOTHES`、Custom Face 與 Custom Clothes 均套用相同規格。
+Face 與 Clothes 採用 Character Preview 的統一 CSS 尺寸及定位，不依素材 ID 設定個別 offset。預覽容器的高寬比為 `1.35`，以容納完整的長身體。`face-layer` 寬度為容器的 `74%`，使用 `aspect-ratio: 1` 維持 1:1 正圓，垂直定位為 `top: 7%`，並以 `left: 50%` 搭配 `translateX(-50%)` 水平置中、`z-index: 2` 顯示在前方。`clothes-layer` 寬度為容器的 `70%`，使用 `aspect-ratio: 25 / 32`（Body 高度為寬度的 1.28 倍）；此組比例只增加 Body 寬度，固定視覺高度仍為約 89.6% 容器寬度，不會再隨 Body width 等比例增加。Body 垂直定位維持 `top: 32%`，同樣水平置中並以 `z-index: 1` 顯示在後方；Clothes 圖片統一填滿此 Body Layer。Body 上端持續伸入 Face 後方，且上方圓角與領口透明區由頭部完整遮住。`accessory-layer` 維持 `z-index: 3`。`FACE_ASSETS`、`DEFAULT_CLOTHES`、Custom Face 與 Custom Clothes 均套用相同規格。
 
 ## 17. Asset Directory
 
