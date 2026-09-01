@@ -197,6 +197,10 @@ Storage Key 已版本化為 `nightMarketLife.characterSettings.v1`。白名單�
 
 預覽使用三個獨立 Layer：`clothes-layer`、`face-layer` 與空的 `accessory-layer`。衣服及臉各自載入圖片；臉使用置中 cover 顯示，衣服使用一致座標的 contain 顯示。未來配件或事件效果可放入 accessory layer，不需重組角色圖片。
 
+### Paper Doll Face / Clothes 相對位置修正
+
+Face 與 Clothes 採用 Character Preview 的統一 CSS 定位，不依素材 ID 設定個別 offset。`clothes-layer` 維持填滿預覽容器、水平置中、`translateY(24%)` 與 `z-index: 1`；`face-layer` 統一使用預覽容器的 `48%` 寬高、水平起點 `26%`（水平置中）、頂端由 `8%` 下移至 `22%`，並維持圓形裁切與 `z-index: 2`。因此 Face 位於 Clothes 前方，頭部下半部會完整覆蓋衣服上緣及領口透明區。`FACE_ASSETS`、`DEFAULT_CLOTHES`、Custom Face 與 Custom Clothes 均透過相同 Layer class 套用這套規格。
+
 ## 17. Asset Directory
 
 ```text
