@@ -195,11 +195,11 @@ Storage Key 已版本化為 `nightMarketLife.characterSettings.v1`。白名單�
 
 ## 16. Character Layer 設計
 
-預覽使用三個獨立 Layer：`clothes-layer`、`face-layer` 與空的 `accessory-layer`。衣服及臉各自載入圖片；臉使用置中 cover 顯示，衣服使用一致座標的 contain 顯示。未來配件或事件效果可放入 accessory layer，不需重組角色圖片。
+預覽使用三個獨立 Layer：`clothes-layer`、`face-layer` 與空的 `accessory-layer`。衣服及臉各自載入圖片；臉使用置中 cover 顯示，衣服則統一填滿窄長 Body Layer。未來配件或事件效果可放入 accessory layer，不需重組角色圖片。
 
 ### Paper Doll Face / Clothes 相對位置修正
 
-Face 與 Clothes 採用 Character Preview 的統一 CSS 尺寸及定位，不依素材 ID 設定個別 offset。`face-layer` 的寬度為預覽容器的 `74%`，以 `aspect-ratio: 1` 維持正方形圓形裁切，`top: 8%`、`left: 50%` 搭配 `translateX(-50%)` 水平置中，並使用 `z-index: 2`。`clothes-layer` 的寬度為預覽容器的 `56%`，同樣以 `aspect-ratio: 1` 建立一致素材區域，`top: 37%`、`left: 50%` 搭配 `translateX(-50%)` 水平置中，並使用 `z-index: 1`。Clothes 頂部因此深入 Face 後方，身體上方圓角與領口透明區會被較寬的頭部完整遮住，形成大頭、窄身體的正式比例。`accessory-layer` 維持 `z-index: 3`。`FACE_ASSETS`、`DEFAULT_CLOTHES`、Custom Face 與 Custom Clothes 均透過相同 Layer class 套用這套規格。
+Face 與 Clothes 採用 Character Preview 的統一 CSS 尺寸及定位，不依素材 ID 設定個別 offset。預覽容器的高寬比由 `1.15` 增加為 `1.35`，以容納完整的長身體。`face-layer` 寬度為容器的 `74%`，使用 `aspect-ratio: 1` 維持 1:1 正圓，垂直定位為 `top: 7%`，並以 `left: 50%` 搭配 `translateX(-50%)` 水平置中、`z-index: 2` 顯示在前方。`clothes-layer` 寬度為容器的 `56%`，使用 `aspect-ratio: 1 / 1.6`，使 Body 高度為寬度的 1.6 倍，垂直定位為 `top: 32%`，同樣水平置中並以 `z-index: 1` 顯示在後方；Clothes 圖片統一填滿此窄長 Layer。Body 上端持續伸入 Face 後方，身體主要向下延長，且上方圓角與領口透明區由頭部完整遮住。`accessory-layer` 維持 `z-index: 3`。`FACE_ASSETS`、`DEFAULT_CLOTHES`、Custom Face 與 Custom Clothes 均套用相同規格。
 
 ## 17. Asset Directory
 
