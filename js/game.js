@@ -5,7 +5,7 @@ import { SCENES, changeScene, render, renderBuildOptions, setStatus } from "./ui
 import { STALL_CONFIG } from "./stalls.js";
 import { applyBuildToPlayer } from "./character.js";
 import { changeClothes, changeFace, setCustomAppearance } from "./character-setup.js";
-import { prepareUploadedImage } from "./uploads.js";
+import { prepareUploadedImage, processCustomClothesImage } from "./uploads.js";
 import { DEFAULT_CLOTHES, FACE_ASSETS, SHOP_CLOTHES } from "../assets/character-assets.js";
 
 export function normalizeActivityResult(result = {}) {
@@ -78,7 +78,8 @@ function bindUI() {
     const kind = event.target.dataset.upload;
     if (!kind) return;
     try {
-      const dataUrl = await prepareUploadedImage(event.target.files?.[0]);
+      const file = event.target.files?.[0];
+      const dataUrl = kind === "clothes" ? await processCustomClothesImage(file) : await prepareUploadedImage(file);
       setCustomAppearance(gameState.player, kind, dataUrl);
       setStatus(kind === "face" ? "自訂臉已套用。" : "自訂衣服已套用。");
       render(gameState);

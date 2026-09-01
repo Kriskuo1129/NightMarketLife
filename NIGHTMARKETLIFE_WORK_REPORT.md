@@ -240,6 +240,12 @@ Clothes Picker 只讀 `DEFAULT_CLOTHES` 並支援首尾循環，不載入 `SHOP_
 
 上傳只接受 PNG、JPEG、WEBP，原始檔案上限為 5 MB。非圖片、過大檔案、讀取失敗、解碼失敗均會顯示友善頁面訊息。成功圖片以 Canvas 等比例縮放至最大 512×512，輸出品質 0.82 的 WEBP Data URL 後再預覽與保存，避免直接將手機原始大圖放入 LocalStorage。若仍遇到儲存容量不足，完成按鈕會顯示提示且不離開角色建立頁。
 
+### Custom Clothes 自動裁切
+
+Custom Clothes 使用獨立的 `processCustomClothesImage(file)` 處理流程。圖片經格式與 5 MB 大小驗證、瀏覽器解碼後，依正式 Body 比例 `25:32` 執行水平及垂直置中的 Center Crop，再縮放至固定 `500×640` Canvas。太寬的來源裁掉左右兩側，太高的來源裁掉上下兩側；方向以瀏覽器完成 EXIF Orientation 解碼後的影像尺寸為準。
+
+Canvas 不填入背景色，因此 PNG／WEBP 的透明 Alpha 會保留；優先以 WEBP quality `0.82` 編碼，瀏覽器不支援 WEBP 時 fallback PNG。裁切或編碼失敗會顯示友善錯誤訊息。LocalStorage 的 `customClothes` 只保存裁切、縮放及編碼後的 Data URL，不保存原始檔案。Custom Face 不受影響，仍沿用最大 512×512 的原比例縮放，再由 Face Layer 做圓形裁切。Custom Clothes 與 Default Clothes 繼續共用相同 Body Layer、尺寸、定位、z-index 與接縫重疊規格。
+
 ## 23. LocalStorage 設計
 
 Character Settings 保存欄位為 `name`、`buildId`、`selectedFaceId`、`selectedClothesId`、`customFace`、`customClothes`。重新整理後首頁帶入上次名稱；再次開始時，Build、預設素材 ID 與自訂圖片均會還原。本局體力、金錢、分數、事件、進度、攤位與成就仍不保存。
@@ -291,6 +297,9 @@ NIGHT_MARKET 本次只顯示「夜市主畫面將於 Step 3 實作」、玩家�
 | DEFAULT_CLOTHES 首尾循環 | PASS |
 | SHOP_CLOTHES 不出現在角色建立 | PASS |
 | Face／Clothes 上傳即時預覽 | PASS |
+| Custom Clothes 正方形／橫向／直向／25:32 Center Crop | PASS（全部輸出 500×640） |
+| Custom Clothes PNG／透明 PNG／WEBP／JPEG | PASS（WEBP 0.82，透明 Alpha 保留） |
+| Custom Clothes 保存後重新整理還原 | PASS（500×640 Data URL） |
 | 非圖片與超過 5 MB 圖片拒絕 | PASS |
 | Character Settings 保存及重新整理還原 | PASS |
 | New Game 不保存本局 GameState | PASS |

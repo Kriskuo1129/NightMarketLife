@@ -1,5 +1,8 @@
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const ACCEPTED_IMAGE_TYPES = Object.freeze(["image/png", "image/jpeg", "image/webp"]);
+export const CLOTHES_OUTPUT_WIDTH = 500;
+export const CLOTHES_OUTPUT_HEIGHT = 640;
+export const IMAGE_OUTPUT_QUALITY = 0.82;
 
 export function validateImageFile(file) {
   if (!file || !ACCEPTED_IMAGE_TYPES.includes(file.type)) {
@@ -29,6 +32,28 @@ function loadImage(src) {
   });
 }
 
+export function calculateCenterCrop(sourceWidth, sourceHeight, targetWidth = CLOTHES_OUTPUT_WIDTH, targetHeight = CLOTHES_OUTPUT_HEIGHT) {
+  if (![sourceWidth, sourceHeight, targetWidth, targetHeight].every((value) => Number.isFinite(value) && value > 0)) {
+    throw new TypeError("圖片裁切尺寸必須是正數。");
+  }
+  const sourceRatio = sourceWidth / sourceHeight;
+  const targetRatio = targetWidth / targetHeight;
+  if (sourceRatio > targetRatio) {
+    const width = sourceHeight * targetRatio;
+    return { x: (sourceWidth - width) / 2, y: 0, width, height: sourceHeight };
+  }
+  const height = sourceWidth / targetRatio;
+  return { x: 0, y: (sourceHeight - height) / 2, width: sourceWidth, height };
+}
+
+function encodeCanvas(canvas) {
+  const webp = canvas.toDataURL("image/webp", IMAGE_OUTPUT_QUALITY);
+  if (webp.startsWith("data:image/webp")) return webp;
+  const png = canvas.toDataURL("image/png");
+  if (png.startsWith("data:image/png")) return png;
+  throw new Error("圖片編碼失敗。");
+}
+
 export async function prepareUploadedImage(file, maxDimension = 512) {
   const validation = validateImageFile(file);
   if (!validation.ok) throw new Error(validation.message);
@@ -41,5 +66,24 @@ export async function prepareUploadedImage(file, maxDimension = 512) {
   const context = canvas.getContext("2d");
   if (!context) throw new Error("瀏覽器無法處理圖片，請重試。");
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/webp", 0.82);
+  return encodeCanvas(canvas);
+}
+
+export async function processCustomClothesImage(file) {
+  const validation = validateImageFile(file);
+  if (!validation.ok) throw new Error(validation.message);
+  const originalDataUrl = await readFileAsDataUrl(file);
+  const image = await loadImage(originalDataUrl);
+  const crop = calculateCenterCrop(image.naturalWidth, image.naturalHeight);
+  const canvas = document.createElement("canvas");
+  canvas.width = CLOTHES_OUTPUT_WIDTH;
+  canvas.height = CLOTHES_OUTPUT_HEIGHT;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("瀏覽器無法處理圖片，請重試。");
+  try {
+    context.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, 0, canvas.width, canvas.height);
+    return encodeCanvas(canvas);
+  } catch {
+    throw new Error("衣服圖片裁切或編碼失敗，請換一張圖片後重試。");
+  }
 }
