@@ -1,0 +1,32 @@
+:root { color-scheme: dark; font-family: system-ui, "Noto Sans TC", sans-serif; color: #fff4dc; background: #17110f; --paper:#fff0cf; --ink:#38241b; --red:#a63f32; --red-dark:#7d2d25; --gold:#f2b94b; --night:#17110f; --panel:#2b1b17; --line:#714b36; }
+* { box-sizing: border-box; }
+body { margin:0; min-height:100vh; background:radial-gradient(circle at 50% -10%,#5b2a20 0,var(--night) 55%); }
+button,input { font:inherit; } button { min-height:44px; cursor:pointer; }
+main { width:min(100%,30rem); min-height:100vh; margin:0 auto; padding:1rem; display:grid; align-items:center; }
+.scene { width:100%; padding:clamp(1.1rem,5vw,2rem); border:1px solid var(--line); border-radius:1.25rem; background:#2b1b17f0; box-shadow:0 1.25rem 4rem #0007; overflow:hidden; }
+.scene[hidden] { display:none; }
+.eyebrow { margin:0 0 .25rem; color:#e7b478; font-size:.72rem; font-weight:800; letter-spacing:.15em; text-transform:uppercase; }
+.signboard { margin:0 auto 1.25rem; padding:1rem; text-align:center; border:.25rem double var(--gold); border-radius:.8rem; background:var(--red); box-shadow:.45rem .45rem 0 #0d0908; }
+h1,h2,p { overflow-wrap:anywhere; } h1 { margin:0; font-size:clamp(2.8rem,14vw,4.7rem); line-height:.95; letter-spacing:.08em; text-shadow:.12em .12em 0 #6d241d; } h2 { margin:0; }
+.tagline { margin:.65rem 0 0; color:#fff7e7; font-weight:700; } .intro { color:#ebd8bd; line-height:1.75; }
+.home-form { display:grid; gap:.65rem; } .home-form label { font-weight:800; color:var(--gold); }
+input[type="text"] { width:100%; min-height:48px; padding:.75rem .9rem; border:2px solid #9c7556; border-radius:.65rem; color:var(--ink); background:var(--paper); font-size:16px; }
+.primary-button,.secondary-actions button,.build-summary,.text-button,.placeholder-scene button,.asset-picker button,.upload-button { border:0; border-radius:.7rem; color:#fff8e8; background:var(--red); font-weight:800; }
+.primary-button { width:100%; padding:.8rem 1rem; box-shadow:0 .25rem 0 var(--red-dark); } .primary-button:active { transform:translateY(.15rem); box-shadow:0 .1rem 0 var(--red-dark); }
+.secondary-actions { display:grid; grid-template-columns:1fr 1fr; gap:.65rem; margin-top:1rem; } .secondary-actions button { padding:.7rem; color:var(--ink); background:#e7c590; }
+.scene-header { display:flex; align-items:center; gap:1rem; } .scene-header .text-button { flex:0 0 auto; padding:.55rem .75rem; background:#493026; }
+.player-greeting { margin:.9rem 0; color:#dfc7a6; } .player-greeting strong { color:var(--gold); }
+.character-preview { position:relative; width:min(100%,19rem); aspect-ratio:1/1.15; margin:0 auto 1rem; border:2px solid #80523a; border-radius:1rem; overflow:hidden; background:linear-gradient(#523326,#2a1c18); }
+.character-layer { position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; } .character-layer img { display:block; width:100%; height:100%; object-fit:contain; object-position:center; }
+.clothes-layer { z-index:1; transform:translateY(24%); } .face-layer { z-index:2; width:48%; height:48%; inset:8% auto auto 26%; overflow:hidden; border-radius:50%; } .face-layer img { object-fit:cover; } .accessory-layer { z-index:3; }
+.appearance-controls { display:grid; grid-template-columns:1fr 1fr; gap:.7rem; } fieldset { min-width:0; margin:0; padding:.7rem; border:1px solid var(--line); border-radius:.8rem; } legend { padding:0 .35rem; color:var(--gold); font-weight:900; }
+.asset-picker { display:grid; grid-template-columns:44px minmax(0,1fr) 44px; align-items:center; gap:.3rem; } .asset-picker button { padding:0; background:#50372c; } .asset-picker output { min-width:0; text-align:center; font-size:.76rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.upload-button { display:grid; place-items:center; min-height:44px; margin-top:.55rem; padding:.45rem; background:#72513c; font-size:.85rem; } .upload-button input { position:absolute; width:1px; height:1px; opacity:0; }
+.build-summary { width:100%; margin:.8rem 0; padding:.8rem 1rem; display:grid; grid-template-columns:auto 1fr; gap:.2rem 1rem; text-align:left; background:#523428; } .build-summary strong { text-align:right; color:var(--gold); } .build-summary small { grid-column:1/-1; }
+.status-message { min-height:1.4em; margin:.2rem 0 .55rem; color:#ffd986; font-size:.88rem; } .placeholder-scene { text-align:center; } .placeholder-scene button { padding:.7rem 1rem; }
+dialog { width:min(calc(100% - 2rem),27rem); max-height:calc(100vh - 2rem); padding:0; border:1px solid #9b6846; border-radius:1rem; color:#fff4dc; background:#2b1b17; box-shadow:0 1.5rem 5rem #000a; } dialog::backdrop { background:#080504cc; backdrop-filter:blur(2px); }
+.dialog-card { padding:1rem; } .dialog-heading { display:flex; align-items:center; justify-content:space-between; gap:.7rem; } .dialog-heading button { width:44px; border:0; border-radius:50%; color:white; background:#50372c; font-size:1.5rem; }
+.build-options { display:grid; gap:.6rem; margin-top:1rem; max-height:65vh; overflow-y:auto; } .build-option { min-height:44px; padding:.75rem; border:1px solid #754c37; border-radius:.75rem; color:#fff5e4; background:#3b2720; text-align:left; } .build-option strong,.build-option span,.build-option small { display:block; } .build-option span { margin:.25rem 0; color:var(--gold); } .build-option small { color:#d8c0a4; } .build-option[aria-pressed="true"] { border-color:var(--gold); background:#593226; }
+.compact-dialog { text-align:center; } .pro-badge { display:inline-block; margin:0; padding:.2rem .55rem; border-radius:999px; color:var(--ink); background:var(--gold); font-weight:900; }
+@media (max-width:350px) { main { padding:.5rem; } .scene { padding:.9rem; border-radius:.9rem; } .appearance-controls { grid-template-columns:1fr; } .character-preview { width:14rem; } .secondary-actions { grid-template-columns:1fr; } }
+@media (min-width:700px) { main { width:min(100%,42rem); } .setup-scene { display:grid; grid-template-columns:1fr 1fr; gap:0 1.2rem; } .setup-scene[hidden] { display:none; } .scene-header,.player-greeting,.appearance-controls,.build-summary,.status-message,.setup-scene>.primary-button { grid-column:1/-1; } }

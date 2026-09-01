@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="NightMarketLife 夜市人生：創造屬於你的精彩一夜。">
+  <title>NightMarketLife 夜市人生</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app">
+    <section class="scene home-scene" data-scene="HOME" aria-labelledby="home-title">
+      <div class="signboard">
+        <p class="eyebrow">Night Market Life</p>
+        <h1 id="home-title">夜市人生</h1>
+        <p class="tagline">你今晚想過得多精彩？</p>
+      </div>
+      <p class="intro">勇闖每晚都不一樣的夜市，玩遍奇奇怪怪的攤位、應付意想不到的大小事，拚盡全力把分數衝高，創造屬於你的精彩一夜！</p>
+      <form id="home-form" class="home-form">
+        <label for="player-name">玩家名稱</label>
+        <input id="player-name" name="playerName" type="text" maxlength="24" autocomplete="nickname" placeholder="可以留空">
+        <button class="primary-button" type="submit">開始遊戲</button>
+      </form>
+      <div class="secondary-actions" aria-label="其他模式">
+        <button type="button" data-action="show-pro">練習模式</button>
+        <button type="button" data-action="show-pro">自訂環境</button>
+      </div>
+    </section>
+
+    <section class="scene setup-scene" data-scene="CHARACTER_SETUP" aria-labelledby="setup-title" hidden>
+      <header class="scene-header">
+        <button class="text-button" type="button" data-scene-target="HOME" aria-label="返回首頁">← 返回</button>
+        <div><p class="eyebrow">Character Setup</p><h2 id="setup-title">外觀設定</h2></div>
+      </header>
+      <p class="player-greeting">今晚的主角：<strong data-player="name"></strong></p>
+      <div class="character-preview" aria-label="角色即時預覽">
+        <div class="character-layer clothes-layer"><img data-preview="clothes" alt="目前選擇的衣服"></div>
+        <div class="character-layer face-layer"><img data-preview="face" alt="目前選擇的臉"></div>
+        <div class="character-layer accessory-layer" aria-hidden="true"></div>
+      </div>
+      <div class="appearance-controls">
+        <fieldset><legend>臉</legend><div class="asset-picker"><button type="button" data-cycle="face" data-direction="-1" aria-label="上一張臉">←</button><output data-asset-name="face"></output><button type="button" data-cycle="face" data-direction="1" aria-label="下一張臉">→</button></div><label class="upload-button">上傳臉<input data-upload="face" type="file" accept="image/png,image/jpeg,image/webp"></label></fieldset>
+        <fieldset><legend>衣</legend><div class="asset-picker"><button type="button" data-cycle="clothes" data-direction="-1" aria-label="上一件衣服">←</button><output data-asset-name="clothes"></output><button type="button" data-cycle="clothes" data-direction="1" aria-label="下一件衣服">→</button></div><label class="upload-button">上傳衣<input data-upload="clothes" type="file" accept="image/png,image/jpeg,image/webp"></label></fieldset>
+      </div>
+      <button class="build-summary" type="button" data-action="open-build"><span>角色 Build</span><strong data-build="name"></strong><small>❤️ <span data-build="stamina"></span>　💰 <span data-build="money"></span></small></button>
+      <p class="status-message" data-status role="status" aria-live="polite"></p>
+      <button class="primary-button" type="button" data-action="complete-character">完成</button>
+    </section>
+
+    <section class="scene placeholder-scene" data-scene="NIGHT_MARKET" aria-labelledby="market-title" hidden>
+      <p class="eyebrow">Step 2 Complete</p><h2 id="market-title">夜市主畫面將於 Step 3 實作</h2><p><strong data-player="name"></strong>，角色設定已保存。</p><button type="button" data-scene-target="HOME">回首頁</button>
+    </section>
+    <section class="scene placeholder-scene" data-scene="RESULT" hidden><h2>結果</h2><p>正式結算畫面尚未實作。</p><button type="button" data-scene-target="HOME">回首頁</button></section>
+  </main>
+
+  <dialog id="build-dialog" aria-labelledby="build-dialog-title"><div class="dialog-card"><div class="dialog-heading"><h2 id="build-dialog-title">選擇角色 Build</h2><button type="button" data-close-dialog aria-label="關閉">×</button></div><div class="build-options" data-build-options></div></div></dialog>
+  <dialog id="pro-dialog" aria-labelledby="pro-dialog-title"><div class="dialog-card compact-dialog"><p class="pro-badge">PRO</p><h2 id="pro-dialog-title">僅限 PRO 會員使用</h2><p>這只是夜市老闆開的玩笑，目前沒有真正的會員系統。</p><button class="primary-button" type="button" data-close-dialog>知道了</button></div></dialog>
+  <script type="module" src="js/game.js"></script>
+</body>
+</html>
