@@ -199,7 +199,7 @@ Storage Key 已版本化為 `nightMarketLife.characterSettings.v1`。白名單�
 
 ### Paper Doll Face / Clothes 相對位置修正
 
-Face 與 Clothes 採用 Character Preview 的統一 CSS 定位，不依素材 ID 設定個別 offset。`clothes-layer` 維持填滿預覽容器、水平置中、`translateY(24%)` 與 `z-index: 1`；`face-layer` 統一使用預覽容器的 `48%` 寬高、水平起點 `26%`（水平置中）、頂端由 `8%` 下移至 `22%`，並維持圓形裁切與 `z-index: 2`。因此 Face 位於 Clothes 前方，頭部下半部會完整覆蓋衣服上緣及領口透明區。`FACE_ASSETS`、`DEFAULT_CLOTHES`、Custom Face 與 Custom Clothes 均透過相同 Layer class 套用這套規格。
+Face 與 Clothes 採用 Character Preview 的統一 CSS 尺寸及定位，不依素材 ID 設定個別 offset。`face-layer` 的寬度為預覽容器的 `74%`，以 `aspect-ratio: 1` 維持正方形圓形裁切，`top: 8%`、`left: 50%` 搭配 `translateX(-50%)` 水平置中，並使用 `z-index: 2`。`clothes-layer` 的寬度為預覽容器的 `56%`，同樣以 `aspect-ratio: 1` 建立一致素材區域，`top: 37%`、`left: 50%` 搭配 `translateX(-50%)` 水平置中，並使用 `z-index: 1`。Clothes 頂部因此深入 Face 後方，身體上方圓角與領口透明區會被較寬的頭部完整遮住，形成大頭、窄身體的正式比例。`accessory-layer` 維持 `z-index: 3`。`FACE_ASSETS`、`DEFAULT_CLOTHES`、Custom Face 與 Custom Clothes 均透過相同 Layer class 套用這套規格。
 
 ## 17. Asset Directory
 
