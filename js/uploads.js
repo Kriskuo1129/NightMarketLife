@@ -2,6 +2,7 @@ export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const ACCEPTED_IMAGE_TYPES = Object.freeze(["image/png", "image/jpeg", "image/webp"]);
 export const CLOTHES_OUTPUT_WIDTH = 500;
 export const CLOTHES_OUTPUT_HEIGHT = 640;
+export const FACE_OUTPUT_SIZE = 512;
 export const IMAGE_OUTPUT_QUALITY = 0.82;
 
 export function validateImageFile(file) {
@@ -85,5 +86,24 @@ export async function processCustomClothesImage(file) {
     return encodeCanvas(canvas);
   } catch {
     throw new Error("衣服圖片裁切或編碼失敗，請換一張圖片後重試。");
+  }
+}
+
+export async function processCustomFaceImage(file) {
+  const validation = validateImageFile(file);
+  if (!validation.ok) throw new Error(validation.message);
+  const originalDataUrl = await readFileAsDataUrl(file);
+  const image = await loadImage(originalDataUrl);
+  const crop = calculateCenterCrop(image.naturalWidth, image.naturalHeight, FACE_OUTPUT_SIZE, FACE_OUTPUT_SIZE);
+  const canvas = document.createElement("canvas");
+  canvas.width = FACE_OUTPUT_SIZE;
+  canvas.height = FACE_OUTPUT_SIZE;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("瀏覽器無法處理圖片，請重試。");
+  try {
+    context.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, 0, canvas.width, canvas.height);
+    return encodeCanvas(canvas);
+  } catch {
+    throw new Error("臉部圖片裁切或編碼失敗，請換一張圖片後重試。");
   }
 }

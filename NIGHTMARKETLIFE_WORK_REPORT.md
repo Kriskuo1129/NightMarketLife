@@ -199,11 +199,15 @@ Storage Key 已版本化為 `nightMarketLife.characterSettings.v1`。白名單�
 
 ### Paper Doll Face / Clothes 相對位置修正
 
-Face 與 Clothes 採用 Character Preview 的統一 CSS 尺寸及定位，不依素材 ID 設定個別 offset。預覽容器的高寬比為 `1.35`，以容納完整的長身體。`face-layer` 寬度為容器的 `74%`，使用 `aspect-ratio: 1` 維持 1:1 正圓，垂直定位為 `top: 7%`，並以 `left: 50%` 搭配 `translateX(-50%)` 水平置中、`z-index: 2` 顯示在前方。`clothes-layer` 寬度為容器的 `70%`，使用 `aspect-ratio: 25 / 32`（Body 高度為寬度的 1.28 倍）；固定視覺高度為約 89.6% 容器寬度。Body 垂直定位為 `top: 30%`，同樣水平置中並以 `z-index: 1` 顯示在後方；Clothes 圖片統一填滿此 Body Layer。Body 上端持續伸入 Face 後方，且上方圓角與領口透明區由頭部完整遮住。`accessory-layer` 維持 `z-index: 3`。`FACE_ASSETS`、`DEFAULT_CLOTHES`、Custom Face 與 Custom Clothes 均套用相同規格。
+Face 與 Clothes 採用 Character Preview 的統一 Layer Mask，不依素材 ID 或圖片透明 Padding 設定外框。預覽容器高寬比為 `1.35`。`face-layer` 寬度為容器的 `63.74%`、`aspect-ratio: 1`、`top: 10.85%`，以 `left: 50%` 搭配 `translateX(-50%)` 水平置中，使用 `border-radius: 50%`、`overflow: hidden` 與 `z-index: 2`。`clothes-layer` 寬度為 `46.07%`、高度為 `52.24%`、`top: 43.48%`，同樣水平置中，使用 `border-radius: 25% / 21%`、`overflow: hidden` 與 `z-index: 1`。`accessory-layer` 維持 `z-index: 3`。Face 在前、Body 在後且上端伸入 Face 下方，接縫沒有空洞、突出、背景縫或領口。
 
-### Paper Doll 頭身接縫重疊修正
+### Character Asset 顯示規格統一
 
-Placeholder Clothes 素材本身具有領口透明區；Body `top` 由 `32%` 上移至 `30%`，只增加 Face 與 Body 的垂直重疊量，使透明領口與上方圓角完整進入 Face 遮蓋範圍。Face `74%`、Body `70%`、兩層高度比例、水平定位及 Layer z-index 均保持不變，未使用額外遮罩。
+舊 Default PNG 以透明 Padding 控制可見大小，但 Custom 圖片直接填滿 74%／70% Layer，造成切換後角色外框改變。量測舊素材後，Default Face 的 512×512 Canvas 非透明 Bounding Box 為 `(36, 36)–(477, 477)`，實際 `441×441`；Default Clothes 的非透明 Bounding Box 為 `(88, 104)–(425, 507)`，實際 `337×403`，並含領口透明洞。依舊 Layer 與 Bounding Box 換算，將當時 Default 的實際可見大小轉為目前正式 Layer：Face `63.74%` 正圓，Body `46.07% × 52.24%` 圓角長方形。Default 與 Custom 現在都以 `width: 100%`、`height: 100%`、`object-fit: cover`、`object-position: center` 填入相同 Layer，由 Layer Mask 決定最終角色外框。
+
+Placeholder Generator 已改為產生滿版 512×512 純色 PNG：Face 不再自帶透明圓形 Padding，圓形完全由 Face Layer 負責；Clothes 不再包含領口、凹槽或透明外框，Body 圓角完全由 Clothes Layer 負責。Face Upload 會以 Center Crop 取 1:1 並輸出 512×512；Clothes Upload 維持 Center Crop 25:32 並輸出 500×640。圖片 Crop 只決定內容取樣，Layer Mask 獨立決定角色形狀。
+
+四種瀏覽器組合 Default Face＋Default Clothes、Custom Face＋Default Clothes、Default Face＋Custom Clothes、Custom Face＋Custom Clothes 的外框實測完全一致：Face 約 `174.27×174.27px`，Body 約 `125.95×193.53px`，top、left、接縫、圓角與 z-index 均相同。Storage v1 不升版；舊 `customFace`／`customClothes` Data URL 可由新的 `object-fit: cover` 與 Layer Mask 安全相容，保留既有 name、build、預設素材選擇與 Custom 圖片，不讓舊圖片改變角色外框。
 
 ## 17. Asset Directory
 
@@ -218,7 +222,7 @@ assets/
 └─ character-assets.js
 ```
 
-五張 Face 與五張 Default Clothes 均為 512×512 透明背景 PNG，採固定座標、純色極簡 Placeholder。預設衣服與未來 Shop Clothes 已分開保存。
+五張 Face 與五張 Default Clothes 均為滿版 512×512 純色 PNG，非透明 Bounding Box 為完整 Canvas。圖片不再包含角色外框或領口；圓形 Face 與圓角 Body 由 CSS Layer Mask 統一負責。預設衣服與未來 Shop Clothes 已分開保存。
 
 ## 18. Asset Manifest
 
@@ -238,13 +242,13 @@ Clothes Picker 只讀 `DEFAULT_CLOTHES` 並支援首尾循環，不載入 `SHOP_
 
 ## 22. Upload 圖片處理
 
-上傳只接受 PNG、JPEG、WEBP，原始檔案上限為 5 MB。非圖片、過大檔案、讀取失敗、解碼失敗均會顯示友善頁面訊息。成功圖片以 Canvas 等比例縮放至最大 512×512，輸出品質 0.82 的 WEBP Data URL 後再預覽與保存，避免直接將手機原始大圖放入 LocalStorage。若仍遇到儲存容量不足，完成按鈕會顯示提示且不離開角色建立頁。
+上傳只接受 PNG、JPEG、WEBP，原始檔案上限為 5 MB。非圖片、過大檔案、讀取失敗、解碼失敗均會顯示友善頁面訊息。Custom Face 經 1:1 Center Crop 後輸出 512×512；Custom Clothes 經 25:32 Center Crop 後輸出 500×640。兩者優先輸出品質 0.82 的 WEBP Data URL 後再預覽與保存，避免將手機原始大圖放入 LocalStorage。若仍遇到儲存容量不足，完成按鈕會顯示提示且不離開角色建立頁。
 
 ### Custom Clothes 自動裁切
 
 Custom Clothes 使用獨立的 `processCustomClothesImage(file)` 處理流程。圖片經格式與 5 MB 大小驗證、瀏覽器解碼後，依正式 Body 比例 `25:32` 執行水平及垂直置中的 Center Crop，再縮放至固定 `500×640` Canvas。太寬的來源裁掉左右兩側，太高的來源裁掉上下兩側；方向以瀏覽器完成 EXIF Orientation 解碼後的影像尺寸為準。
 
-Canvas 不填入背景色，因此 PNG／WEBP 的透明 Alpha 會保留；優先以 WEBP quality `0.82` 編碼，瀏覽器不支援 WEBP 時 fallback PNG。裁切或編碼失敗會顯示友善錯誤訊息。LocalStorage 的 `customClothes` 只保存裁切、縮放及編碼後的 Data URL，不保存原始檔案。Custom Face 不受影響，仍沿用最大 512×512 的原比例縮放，再由 Face Layer 做圓形裁切。Custom Clothes 與 Default Clothes 繼續共用相同 Body Layer、尺寸、定位、z-index 與接縫重疊規格。
+Canvas 不填入背景色，因此 PNG／WEBP 的透明 Alpha 會保留；優先以 WEBP quality `0.82` 編碼，瀏覽器不支援 WEBP 時 fallback PNG。裁切或編碼失敗會顯示友善錯誤訊息。LocalStorage 的 `customFace`／`customClothes` 只保存裁切、縮放及編碼後的 Data URL，不保存原始檔案。Custom 與 Default 圖片共用相同 Face／Body Layer、尺寸、定位、z-index 與接縫重疊規格。
 
 ## 23. LocalStorage 設計
 
@@ -297,22 +301,24 @@ NIGHT_MARKET 本次只顯示「夜市主畫面將於 Step 3 實作」、玩家�
 | DEFAULT_CLOTHES 首尾循環 | PASS |
 | SHOP_CLOTHES 不出現在角色建立 | PASS |
 | Face／Clothes 上傳即時預覽 | PASS |
+| Custom Face 正方形／橫向／直向 1:1 Center Crop | PASS（全部輸出 512×512） |
 | Custom Clothes 正方形／橫向／直向／25:32 Center Crop | PASS（全部輸出 500×640） |
 | Custom Clothes PNG／透明 PNG／WEBP／JPEG | PASS（WEBP 0.82，透明 Alpha 保留） |
 | Custom Clothes 保存後重新整理還原 | PASS（500×640 Data URL） |
+| Default／Custom Face × Default／Custom Clothes 四種組合外框 | PASS（Face／Body 尺寸、位置、Mask、接縫完全一致） |
 | 非圖片與超過 5 MB 圖片拒絕 | PASS |
 | Character Settings 保存及重新整理還原 | PASS |
 | New Game 不保存本局 GameState | PASS |
 | 完成後進入 NIGHT_MARKET Placeholder | PASS |
 | 練習模式／自訂環境 PRO 提示 | PASS |
-| 320px 無水平捲動 | PASS（clientWidth 320 / scrollWidth 320） |
+| 320px 無水平捲動 | PASS（innerWidth 320，無水平 overflow） |
 | 瀏覽器 Console | PASS（0 Error / Warning） |
 
 實際瀏覽器已依規格完成流程 A～G。`tests/core.test.mjs` 同時涵蓋素材數量、循環、Build 初始值重設、上傳檔案驗證、Character Settings 保存與所有 Step 1 行為。
 
 ## 30. 已知限制
 
-Paper Doll 目前是純色 Placeholder；上傳圖片沒有裁切、拖曳、縮放控制或自動去背。LocalStorage 容量依瀏覽器而異，即使圖片已縮放壓縮，兩張高細節圖片仍可能觸發容量限制，此時 UI 會要求更換較小圖片。原生 dialog 需要現代瀏覽器。
+Paper Doll 目前是純色 Placeholder；上傳圖片會自動 Center Crop，但沒有手動裁切編輯器、拖曳、縮放控制或自動去背。LocalStorage 容量依瀏覽器而異，即使圖片已縮放壓縮，兩張高細節圖片仍可能觸發容量限制，此時 UI 會要求更換較小圖片。原生 dialog 需要現代瀏覽器。
 
 ## 31. Step 3 尚未實作內容與建議下一步
 

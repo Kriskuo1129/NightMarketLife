@@ -22,7 +22,7 @@ const { createNewGame, applyActivityResult } = await import("../js/game.js");
 const { applyBuildToPlayer, getPlayerDisplayName } = await import("../js/character.js");
 const { cycleAsset, changeClothes, changeFace, setCustomAppearance } = await import("../js/character-setup.js");
 const { FACE_ASSETS, DEFAULT_CLOTHES, SHOP_CLOTHES } = await import("../assets/character-assets.js");
-const { validateImageFile, calculateCenterCrop, MAX_UPLOAD_BYTES, CLOTHES_OUTPUT_WIDTH, CLOTHES_OUTPUT_HEIGHT } = await import("../js/uploads.js");
+const { validateImageFile, calculateCenterCrop, MAX_UPLOAD_BYTES, CLOTHES_OUTPUT_WIDTH, CLOTHES_OUTPUT_HEIGHT, FACE_OUTPUT_SIZE } = await import("../js/uploads.js");
 const { saveCharacterSettings, loadCharacterSettings } = await import("../js/storage.js");
 
 assert.deepEqual(CONFIG.characterBuilds.map(({ name, stamina, money }) => ({ name, stamina, money })), [
@@ -66,10 +66,13 @@ assert.equal(validateImageFile({ type: "text/plain", size: 10 }).ok, false);
 assert.equal(validateImageFile({ type: "image/png", size: MAX_UPLOAD_BYTES + 1 }).ok, false);
 assert.equal(validateImageFile({ type: "image/webp", size: 1024 }).ok, true);
 assert.equal(CLOTHES_OUTPUT_WIDTH / CLOTHES_OUTPUT_HEIGHT, 25 / 32);
+assert.equal(FACE_OUTPUT_SIZE, 512);
 assert.deepEqual(calculateCenterCrop(1000, 1000), { x: 109.375, y: 0, width: 781.25, height: 1000 });
 assert.deepEqual(calculateCenterCrop(1600, 900), { x: 448.4375, y: 0, width: 703.125, height: 900 });
 assert.deepEqual(calculateCenterCrop(900, 1600), { x: 0, y: 224, width: 900, height: 1152 });
 assert.deepEqual(calculateCenterCrop(500, 640), { x: 0, y: 0, width: 500, height: 640 });
+assert.deepEqual(calculateCenterCrop(1200, 600, FACE_OUTPUT_SIZE, FACE_OUTPUT_SIZE), { x: 300, y: 0, width: 600, height: 600 });
+assert.deepEqual(calculateCenterCrop(600, 1200, FACE_OUTPUT_SIZE, FACE_OUTPUT_SIZE), { x: 0, y: 300, width: 600, height: 600 });
 assert.throws(() => calculateCenterCrop(0, 640), /正數/);
 
 saveCharacterSettings(gameState.player);

@@ -1,24 +1,19 @@
 """Create deterministic 512px placeholder character PNGs for Step 2 development."""
 
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 SIZE = 512
 
 
 def create_face(path: Path, color: str) -> None:
-    image = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(image)
-    draw.ellipse((36, 36, 476, 476), fill=color)
+    image = Image.new("RGBA", (SIZE, SIZE), color)
     image.save(path, "PNG")
 
 
 def create_clothes(path: Path, color: str) -> None:
-    image = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(image)
-    draw.rounded_rectangle((88, 104, 424, 506), radius=84, fill=color)
-    draw.ellipse((188, 64, 324, 200), fill=(0, 0, 0, 0))
+    image = Image.new("RGBA", (SIZE, SIZE), color)
     image.save(path, "PNG")
 
 
