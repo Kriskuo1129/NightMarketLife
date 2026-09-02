@@ -323,3 +323,107 @@ Paper Doll 目前是純色 Placeholder；上傳圖片會自動 Center Crop，但
 ## 31. Step 3 尚未實作內容與建議下一步
 
 Step 3 的 HUD、夜市展示區、玩家角色在夜市場景中的配置、攤位 Carousel 與回家按鈕均尚未實作。其他攤位 Life、環境／開局事件、成就條件、正式服飾店、服裝效果及外部遊戲串接也未提前製作。下一步應先由專案負責人檢查 Step 2 流程、Appearance Model、素材規格與報告，再依新指令開始 Step 3。
+
+---
+
+# NightMarketLife Step 3 工作報告
+
+## 32. Step 3 目標
+
+完成主程式建構 Step 3「夜市主畫面」：玩家完成角色建立後可進入 NIGHT_MARKET，查看 HUD、自己的角色、環境狀態與 7 個攤位，瀏覽攤位資訊、開啟功能 Placeholder，並經回家確認前往 RESULT Placeholder。本次沒有實作任何 Step 4 資源變化或正式攤位活動。
+
+## 33. Night Market Layout
+
+夜市畫面採手機直式優先，由 HUD、環境狀態、夜市展示區、攤位 Carousel、選中攤位資訊與回家按鈕依序構成。桌面維持置中的手機遊戲版型；HTML 與 CSS 使用暖黃、深棕、米色、燈泡、棚架與招牌 Placeholder，沒有導入 Canvas、Framework 或正式美術資產。
+
+## 34. HUD
+
+HUD 直接從 `gameState.player` Render `stamina / maxStamina`、`score` 與 `money`，不從 HTML 文字反推狀態，也沒有重做 Step 1 的分數或資源規則。後續 ActivityResult 更新 Player 後可沿用同一 Render 流程刷新。
+
+## 35. Environment Status
+
+環境區直接讀取 `gameState.environment`。正常時只顯示「今晚一切正常」；實際為 true 的 Major Status 才顯示下雨、蚊子或網紅訊息。`crowdLevel`、`priceLevel`、`rewardLevel` 保留於 Environment Model，但不在正常狀態下塞滿 HUD，也沒有套用 Gameplay Effect。
+
+## 36. Night Market Scene Area
+
+展示區以 HTML + CSS 建立夜空、暖色燈泡、遠景攤棚、地面與方向招牌。方向招牌會隨 `selectedStallId` 顯示目前面對的攤位，角色位於畫面偏下中央；本次沒有角色移動、方向鍵或正式環境動畫。
+
+## 37. Reusable Character Renderer
+
+新增 `js/character-renderer.js`，以普通 JS Helper 建立並更新 `clothes-layer`、`face-layer`、`accessory-layer`。CHARACTER_SETUP 與 NIGHT_MARKET 都使用相同 Renderer 與 Appearance Model，未導入 React、Vue、Web Component Framework。
+
+## 38. Character Asset Standard 重用方式
+
+角色的 Face／Body 尺寸、top、水平置中、Mask、圓角與 z-index 仍由 Step 2 的同一組 CSS 規格控制。夜市場景只縮放整個 `.character-renderer` 容器，不另算 Face 或 Body 比例；Default 與 Custom Face／Clothes 因此沿用相同外框。
+
+## 39. Stall Config
+
+`js/stalls.js` 正式加入資料驅動的 Stall Config。每筆包含 `id`、`name`、`type`、`isSpecial`、`interactionType`、`icon`、`description` 與既有 Model 所需欄位。Icon 目前使用 Emoji Placeholder，沒有放入 Character Asset Manifest。
+
+## 40. 7 個 Stall
+
+目前共 7 攤：3 個 Game（`game_01`～`game_03`）、2 個 Food（`food_01`～`food_02`）、管理處與服飾店。一般攤位依既有規則初始化 10～20 Life；管理處與服飾店為 Special Stall，不使用一般 Life。
+
+## 41. Carousel
+
+Carousel 支援點擊 Card、原生橫向 Touch Scroll、CSS Scroll Snap，以及首尾循環的左右箭頭。Card 顯示 Icon、名稱、類型與營業狀態；箭頭切換會更新選中狀態並將對應 Card 捲入視野。直接 Swipe 後需點擊 Card 才同步 Selected，符合本階段允許的簡化範圍。
+
+## 42. Selected Stall
+
+選中攤位保存於 `gameState.session.selectedStallId`，New Game 預設為 `stalls[0]`。Selected Card 使用邊框、背景與小幅位移區隔；夜市招牌和詳細資訊區都由同一 State Render，不只存在 DOM。
+
+## 43. Stall View State
+
+新增 `getStallViewState(stall, environment)`，集中產生 `isClosed`、`isBlocked`、`canEnter`、類型、狀態、提示與 Life 文案。一般攤位顯示剩餘 Life；特殊攤位隱藏一般 Life。選擇或切換攤位不增加 `actionCount` 或 `statistics.totalActions`。
+
+## 44. Closed / Blocked 顯示
+
+`stall.isClosed === true` 時顯示「休攤」並停用進入按鈕。攤位 ID 等於 `environment.influencerBlockedStallId` 時顯示「網紅正在拍攝，暫時無法進入」並停用按鈕。兩者都只處理 View State，不實作事件生命週期。
+
+## 45. Placeholder Enter
+
+可進入攤位按下後只開啟原生 dialog。一般攤位顯示 Step 4 準備中訊息；管理處與服飾店顯示各自的後續 Step Placeholder。此操作不改變體力、金錢、分數、進度、Statistics 或 Stall Life。
+
+## 46. Home / Return Flow
+
+夜市內主要離開操作為「回家」。第一次按下會開啟「今晚就先回家嗎？」Confirmation；「繼續逛」關閉 dialog 並留在 NIGHT_MARKET，「回家」才切換 RESULT。CHARACTER_SETUP 的返回首頁流程仍保留。
+
+## 47. RESULT Placeholder
+
+RESULT 顯示「結算功能將於後續 Step 實作」、玩家名稱及目前 score、money、stamina / maxStamina，並提供「回首頁」。本次沒有成就、排名、評語、活動統計、Game Over 或正式 Settlement。
+
+## 48. Responsive
+
+主畫面於 320、390、430px 實測均無 body／整頁水平 Overflow；Carousel 自己保留橫向捲動。桌面採限制寬度後置中，觸控操作使用原生 `overflow-x: auto` 與 Scroll Snap。輕微角色 Idle 動畫支援 `prefers-reduced-motion`。
+
+## 49. Debug
+
+`window.NMLDebug` 新增 `selectStall(id)`、`closeStall(id)`、`openStall(id)`、`setRain(value)`、`setMosquito(value)`、`setInfluencer(value, stallId?)` 與 `render()`。Debug 只修改指定 Model 欄位並 Render，不會執行正式事件或 Gameplay。
+
+## 50. Tests
+
+| 驗證項目 | 結果 |
+| --- | --- |
+| Step 1／Step 2 核心行為保持通過 | PASS |
+| CHARACTER_SETUP → NIGHT_MARKET | PASS |
+| HUD 讀取 stamina、maxStamina、score、money | PASS |
+| 共用 Character Renderer／三層結構 | PASS |
+| 7 個 Stall（3 Game、2 Food、Management、Clothing） | PASS |
+| Carousel 首尾循環與 selectedStallId | PASS |
+| 一般 Stall Life／Special Stall 不顯示 Life | PASS |
+| Closed／Influencer Blocked 停用進入 | PASS |
+| Rain／Mosquito／Influencer Debug View State | PASS |
+| 進入 Placeholder 不改資源、進度、Statistics、Life | PASS |
+| 回家取消／確認／RESULT／回首頁流程 | PASS |
+| 320／390／430px 無整頁水平 Scroll | PASS |
+| 瀏覽器 Console Error / Warning | PASS（0 筆） |
+
+實際瀏覽器完成 HOME → CHARACTER_SETUP → NIGHT_MARKET、7 攤顯示與切換、特殊攤位資訊、進入 Placeholder、HUD 不變、回家取消與確認、RESULT 數值顯示，以及三種手機寬度檢查。`tests/core.test.mjs` 完整執行結果為 `NightMarketLife core tests: PASS`。
+
+## 51. 已知限制
+
+目前攤位圖示與夜市場景都是 Emoji／CSS Placeholder；Swipe 後不自動計算最近 Card，使用者需點擊 Card 才更新 Selected。環境狀態只顯示 Major Status，沒有事件觸發、動畫或效果。RESULT、管理處、服飾店及所有攤位內容仍是 Placeholder。
+
+## 52. Step 4 尚未實作內容
+
+本次未實作正式 Game／Food／Work 活動、ActivityResult 資源變化、體力不足、價格、食物恢復、攤位 Life 扣除、夜市 Action 進度、4～6 Action 事件觸發、Rain／Mosquito／Influencer Gameplay、倍率效果、成就、服飾購買／效果、管理處功能、正式結算、NML_MoMaJohn、iframe 或 postMessage。下一步必須等待新指令後才可開始 Step 4。

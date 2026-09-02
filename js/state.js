@@ -16,15 +16,16 @@ export function createStatistics() {
 }
 
 export function createGameState(characterSettings = {}) {
+  const stalls = createInitialStalls();
   return {
     player: createPlayer(characterSettings),
     environment: createEnvironment(),
     progress: createProgress(),
-    stalls: createInitialStalls(),
+    stalls,
     activeEvents: createActiveEvents(),
     statistics: createStatistics(),
     achievements: createInitialAchievements(),
-    session: { scene: "HOME", lastActivitySourceId: null }
+    session: { scene: "HOME", lastActivitySourceId: null, selectedStallId: stalls[0]?.id ?? null }
   };
 }
 

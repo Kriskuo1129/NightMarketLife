@@ -34,11 +34,7 @@
         <div><p class="eyebrow">Character Setup</p><h2 id="setup-title">外觀設定</h2></div>
       </header>
       <p class="player-greeting">今晚的主角：<strong data-player="name"></strong></p>
-      <div class="character-preview" aria-label="角色即時預覽">
-        <div class="character-layer clothes-layer"><img data-preview="clothes" alt="目前選擇的衣服"></div>
-        <div class="character-layer face-layer"><img data-preview="face" alt="目前選擇的臉"></div>
-        <div class="character-layer accessory-layer" aria-hidden="true"></div>
-      </div>
+      <div class="character-preview" data-character-host data-character-label="角色即時預覽"></div>
       <div class="appearance-controls">
         <fieldset><legend>臉</legend><div class="asset-picker"><button type="button" data-cycle="face" data-direction="-1" aria-label="上一張臉">←</button><output data-asset-name="face"></output><button type="button" data-cycle="face" data-direction="1" aria-label="下一張臉">→</button></div><label class="upload-button">上傳臉<input data-upload="face" type="file" accept="image/png,image/jpeg,image/webp"></label></fieldset>
         <fieldset><legend>衣</legend><div class="asset-picker"><button type="button" data-cycle="clothes" data-direction="-1" aria-label="上一件衣服">←</button><output data-asset-name="clothes"></output><button type="button" data-cycle="clothes" data-direction="1" aria-label="下一件衣服">→</button></div><label class="upload-button">上傳衣<input data-upload="clothes" type="file" accept="image/png,image/jpeg,image/webp"></label></fieldset>
@@ -48,14 +44,68 @@
       <button class="primary-button" type="button" data-action="complete-character">完成</button>
     </section>
 
-    <section class="scene placeholder-scene" data-scene="NIGHT_MARKET" aria-labelledby="market-title" hidden>
-      <p class="eyebrow">Step 2 Complete</p><h2 id="market-title">夜市主畫面將於 Step 3 實作</h2><p><strong data-player="name"></strong>，角色設定已保存。</p><button type="button" data-scene-target="HOME">回首頁</button>
+    <section class="scene market-scene" data-scene="NIGHT_MARKET" aria-labelledby="market-title" hidden>
+      <header class="market-hud">
+        <div class="hud-title"><p class="eyebrow">Night Market</p><h2 id="market-title">今晚的夜市</h2></div>
+        <dl class="hud-stats" aria-label="玩家狀態">
+          <div><dt>❤️ 體力</dt><dd data-player="stamina"></dd></div>
+          <div><dt>⭐ 精彩分數</dt><dd data-player="score"></dd></div>
+          <div><dt>💰 金錢</dt><dd data-player="money"></dd></div>
+        </dl>
+        <div class="environment-panel" aria-live="polite">
+          <strong>目前夜市狀況</strong>
+          <div class="environment-statuses" data-environment-statuses></div>
+        </div>
+      </header>
+
+      <div class="night-market-stage">
+        <div class="bulb-string" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="market-stalls-backdrop" aria-hidden="true"><span></span><span></span><span></span></div>
+        <p class="market-direction">前方：<strong data-selected-stall="sceneName"></strong></p>
+        <div class="market-character-wrap">
+          <div class="market-character" data-character-host data-character-label="夜市中的玩家角色"></div>
+          <span class="market-player-name" data-player="name"></span>
+        </div>
+      </div>
+
+      <section class="stall-browser" aria-labelledby="stall-browser-title">
+        <div class="section-heading"><div><p class="eyebrow">Stalls</p><h3 id="stall-browser-title">今晚逛哪一攤？</h3></div><div class="carousel-arrows"><button type="button" data-stall-direction="-1" aria-label="上一個攤位">←</button><button type="button" data-stall-direction="1" aria-label="下一個攤位">→</button></div></div>
+        <div class="stall-carousel" data-stall-carousel role="list" aria-label="夜市攤位"></div>
+      </section>
+
+      <section class="selected-stall-panel" aria-labelledby="selected-stall-title">
+        <div class="selected-stall-heading"><span class="selected-stall-icon" data-selected-stall="icon" aria-hidden="true"></span><div><p class="stall-type" data-selected-stall="type"></p><h3 id="selected-stall-title" data-selected-stall="name"></h3></div></div>
+        <p data-selected-stall="description"></p>
+        <dl class="stall-details"><div><dt>營業狀態</dt><dd data-selected-stall="status"></dd></div><div data-stall-life-row><dt>營業耐久</dt><dd data-selected-stall="life"></dd></div></dl>
+        <p class="stall-notice" data-selected-stall="notice"></p>
+        <button class="primary-button" type="button" data-action="enter-stall">進入攤位</button>
+      </section>
+      <button class="go-home-button" type="button" data-action="go-home">回家</button>
     </section>
-    <section class="scene placeholder-scene" data-scene="RESULT" hidden><h2>結果</h2><p>正式結算畫面尚未實作。</p><button type="button" data-scene-target="HOME">回首頁</button></section>
+
+    <section class="scene result-scene" data-scene="RESULT" aria-labelledby="result-title" hidden>
+      <p class="eyebrow">Tonight's Result</p>
+      <h2 id="result-title">結算功能將於後續 Step 實作</h2>
+      <p class="result-player"><strong data-player="name"></strong>，今晚先逛到這裡。</p>
+      <dl class="result-stats"><div><dt>⭐ 精彩分數</dt><dd data-player="score"></dd></div><div><dt>💰 金錢</dt><dd data-player="money"></dd></div><div><dt>❤️ 體力</dt><dd data-player="stamina"></dd></div></dl>
+      <button class="primary-button" type="button" data-scene-target="HOME">回首頁</button>
+    </section>
   </main>
 
   <dialog id="build-dialog" aria-labelledby="build-dialog-title"><div class="dialog-card"><div class="dialog-heading"><h2 id="build-dialog-title">選擇角色 Build</h2><button type="button" data-close-dialog aria-label="關閉">×</button></div><div class="build-options" data-build-options></div></div></dialog>
   <dialog id="pro-dialog" aria-labelledby="pro-dialog-title"><div class="dialog-card compact-dialog"><p class="pro-badge">PRO</p><h2 id="pro-dialog-title">僅限 PRO 會員使用</h2><p>這只是夜市老闆開的玩笑，目前沒有真正的會員系統。</p><button class="primary-button" type="button" data-close-dialog>知道了</button></div></dialog>
+  <dialog id="stall-dialog" aria-labelledby="stall-dialog-title"><div class="dialog-card compact-dialog"><p class="pro-badge">準備中</p><h2 id="stall-dialog-title" data-stall-dialog-title>老闆還在準備中！</h2><p data-stall-dialog-message>攤位功能將於 Step 4 實作。</p><button class="primary-button" type="button" data-close-dialog>繼續逛</button></div></dialog>
+  <dialog id="home-dialog" aria-labelledby="home-dialog-title">
+    <div class="dialog-card compact-dialog">
+      <p class="eyebrow">Going Home</p>
+      <h2 id="home-dialog-title">今晚就先回家嗎？</h2>
+      <p>正式結算還在準備中，現在回家會先前往結果 Placeholder。</p>
+      <div class="confirmation-actions">
+        <button type="button" data-close-dialog>繼續逛</button>
+        <button class="primary-button" type="button" data-action="confirm-home">回家</button>
+      </div>
+    </div>
+  </dialog>
   <script type="module" src="js/game.js"></script>
 </body>
 </html>

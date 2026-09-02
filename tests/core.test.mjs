@@ -15,16 +15,17 @@ globalThis.document = {
 globalThis.window = {};
 
 const { CONFIG } = await import("../js/config.js");
-const { createStall, STALL_TYPES, INTERACTION_TYPES } = await import("../js/stalls.js");
+const { createStall, cycleStallId, getStallViewState, STALL_CONFIG, STALL_TYPES, INTERACTION_TYPES } = await import("../js/stalls.js");
 const { createAchievement, ACHIEVEMENT_RARITIES } = await import("../js/achievements.js");
 const { gameState } = await import("../js/state.js");
-const { createNewGame, applyActivityResult } = await import("../js/game.js");
+const { createNewGame, applyActivityResult, completeCharacterSetup, getStallPlaceholderCopy, selectStallAndScroll, setEnvironmentFlag, setInfluencer, setStallClosed } = await import("../js/game.js");
 const { applyBuildToPlayer, getPlayerDisplayName } = await import("../js/character.js");
 const { cycleAsset, changeClothes, changeFace, setCustomAppearance } = await import("../js/character-setup.js");
 const { FACE_ASSETS, DEFAULT_CLOTHES, SHOP_CLOTHES } = await import("../assets/character-assets.js");
 const { validateImageFile, calculateCenterCrop, MAX_UPLOAD_BYTES, CLOTHES_OUTPUT_WIDTH, CLOTHES_OUTPUT_HEIGHT, FACE_OUTPUT_SIZE } = await import("../js/uploads.js");
 const { saveCharacterSettings, loadCharacterSettings } = await import("../js/storage.js");
 
+const { CHARACTER_LAYER_NAMES } = await import("../js/character-renderer.js");
 assert.deepEqual(CONFIG.characterBuilds.map(({ name, stamina, money }) => ({ name, stamina, money })), [
   { name: "高中生", stamina: 120, money: 600 },
   { name: "大學生", stamina: 110, money: 800 },
@@ -111,3 +112,52 @@ const achievement = createAchievement({ id: "test", name: "測試成就", rarity
 assert.equal(achievement.unlocked, false);
 
 console.log("NightMarketLife core tests: PASS");
+
+assert.equal(STALL_CONFIG.length, 7);
+assert.equal(gameState.stalls.length, 7);
+assert.equal(gameState.stalls.filter((item) => item.type === STALL_TYPES.GAME).length, 3);
+assert.equal(gameState.stalls.filter((item) => item.type === STALL_TYPES.FOOD).length, 2);
+assert.ok(gameState.stalls.some((item) => item.id === "management" && item.isSpecial));
+assert.ok(gameState.stalls.some((item) => item.id === "clothing" && item.isSpecial));
+assert.equal(gameState.session.selectedStallId, gameState.stalls[0].id);
+assert.deepEqual(CHARACTER_LAYER_NAMES, ["clothes", "face", "accessory"]);
+
+const firstStallId = gameState.stalls[0].id;
+const lastStallId = gameState.stalls.at(-1).id;
+assert.equal(cycleStallId(gameState.stalls, firstStallId, -1), lastStallId);
+assert.equal(cycleStallId(gameState.stalls, lastStallId, 1), firstStallId);
+assert.equal(selectStallAndScroll("food_01"), true);
+assert.equal(gameState.session.selectedStallId, "food_01");
+assert.equal(selectStallAndScroll("missing-stall"), false);
+
+const normalView = getStallViewState(gameState.stalls[0], gameState.environment);
+assert.equal(normalView.canEnter, true);
+assert.ok(normalView.lifeText.startsWith("剩餘："));
+const specialView = getStallViewState(gameState.stalls.find((item) => item.id === "management"), gameState.environment);
+assert.equal(specialView.lifeText, null);
+
+assert.equal(setStallClosed(firstStallId, true), true);
+assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).canEnter, false);
+assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).statusText, "休攤");
+setStallClosed(firstStallId, false);
+setInfluencer(true, firstStallId);
+assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).isBlocked, true);
+assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).canEnter, false);
+setInfluencer(false);
+
+assert.equal(setEnvironmentFlag("raining", true), true);
+assert.equal(setEnvironmentFlag("mosquito", true), true);
+assert.equal(gameState.environment.raining, true);
+assert.equal(gameState.environment.mosquito, true);
+assert.equal(setEnvironmentFlag("unknown", true), false);
+
+const resourceSnapshot = JSON.stringify({ player: gameState.player, progress: gameState.progress, life: gameState.stalls.map((item) => item.life) });
+assert.match(getStallPlaceholderCopy(gameState.stalls[0]).message, /Step 4/);
+assert.match(getStallPlaceholderCopy(gameState.stalls.find((item) => item.id === "management")).message, /管理處/);
+assert.match(getStallPlaceholderCopy(gameState.stalls.find((item) => item.id === "clothing")).message, /服飾店/);
+assert.equal(JSON.stringify({ player: gameState.player, progress: gameState.progress, life: gameState.stalls.map((item) => item.life) }), resourceSnapshot);
+
+assert.equal(completeCharacterSetup(), true);
+assert.equal(gameState.session.scene, "NIGHT_MARKET");
+assert.equal(gameState.progress.actionCount, 0);
+assert.equal(gameState.statistics.totalActions, 0);
