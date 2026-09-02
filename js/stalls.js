@@ -14,6 +14,12 @@ export const STALL_CONFIG = Object.freeze([
   Object.freeze({ id: "clothing", name: "服飾店", type: STALL_TYPES.CLOTHING, isSpecial: true, interactionType: INTERACTION_TYPES.SERVICE, icon: "👕", description: "看看今晚有沒有適合你的衣服。" })
 ]);
 
+export const TEST_GAME_RESULTS = Object.freeze({
+  game_01: Object.freeze({ staminaDelta: -10, scoreDelta: 20, moneyDelta: 50, completed: true, progressCost: 1, sourceId: "game_01" }),
+  game_02: Object.freeze({ staminaDelta: -10, scoreDelta: 10, moneyDelta: 100, completed: true, progressCost: 1, sourceId: "game_02" }),
+  game_03: Object.freeze({ staminaDelta: -10, scoreDelta: 30, moneyDelta: 20, completed: true, progressCost: 1, sourceId: "game_03" })
+});
+
 const randomInteger = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 export function createStall(definition) {

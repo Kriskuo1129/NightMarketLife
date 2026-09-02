@@ -96,17 +96,31 @@ export function getEnvironmentStageView(environment) {
   };
 }
 
-function renderEnvironmentStage(environment) {
+function formatSignedDelta(value) {
+  return value > 0 ? `+${value}` : String(value);
+}
+
+function renderEnvironmentStage(gameState) {
   const stage = document.querySelector("[data-environment-stage]");
   if (!stage) return;
-  const view = getEnvironmentStageView(environment);
+  const presentation = gameState.session.presentation;
+  const view = getEnvironmentStageView(gameState.environment);
+  const showingResult = presentation?.type === "ACTIVITY_RESULT";
+  stage.dataset.presentation = showingResult ? "activity-result" : "environment";
   stage.dataset.environmentStage = view.code;
   stage.dataset.raining = String(view.raining);
   stage.dataset.mosquito = String(view.mosquito);
   stage.dataset.influencer = String(view.influencer);
   stage.dataset.crowded = String(view.crowded);
+  const kicker = stage.querySelector("[data-stage-kicker]");
   const message = stage.querySelector("[data-environment-message]");
-  if (message) message.textContent = view.message;
+  const result = stage.querySelector("[data-activity-result]");
+  if (kicker) kicker.textContent = showingResult ? "挑戰結果" : "今晚的夜市";
+  if (message) message.textContent = showingResult ? presentation.title : view.message;
+  if (result) {
+    result.hidden = !showingResult;
+    if (showingResult) result.textContent = `❤️ ${formatSignedDelta(presentation.staminaDelta)}　⭐ ${formatSignedDelta(presentation.scoreDelta)}　💰 ${formatSignedDelta(presentation.moneyDelta)}`;
+  }
 }
 
 function createStallCard(stall) {
@@ -170,7 +184,7 @@ export function scrollSelectedStallIntoView() {
 }
 
 export function renderNightMarket(gameState) {
-  renderEnvironmentStage(gameState.environment);
+  renderEnvironmentStage(gameState);
   const grid = document.querySelector("[data-stall-grid]");
   if (!grid) return;
   ensureStallCards(gameState, grid);
@@ -189,13 +203,16 @@ export function renderNightMarket(gameState) {
   const selectedValues = {
     name: stall.name,
     status: view.label,
-    reason: view.canEnter ? "" : view.notice
+    reason: view.canEnter ? "" : view.notice,
+    stamina: stall.type === "GAME" ? `❤️ 體力 ${stall.staminaCost}` : ""
   };
   document.querySelectorAll("[data-selected-stall]").forEach((element) => {
     element.textContent = selectedValues[element.dataset.selectedStall] ?? "";
   });
   const reason = document.querySelector('[data-selected-stall="reason"]');
   if (reason) reason.hidden = view.canEnter;
+  const stamina = document.querySelector('[data-selected-stall="stamina"]');
+  if (stamina) stamina.closest(".stall-entry-cost").hidden = stall.type !== "GAME";
   const enterButton = document.querySelector('#stall-detail-dialog [data-action="enter-stall"]');
   if (enterButton) enterButton.disabled = !view.canEnter;
 }

@@ -2,7 +2,7 @@ import { CONFIG, getBuildById } from "./config.js";
 import { gameState, resetGameState } from "./state.js";
 import { clearCharacterSettings, loadCharacterSettings, saveCharacterSettings } from "./storage.js";
 import { SCENES, changeScene, getSelectedStall, render, renderBuildOptions, scrollSelectedStallIntoView, selectStall, setStatus } from "./ui.js";
-import { STALL_CONFIG, STALL_TYPES } from "./stalls.js";
+import { getStallDisplayStatus, STALL_CONFIG, STALL_TYPES, TEST_GAME_RESULTS } from "./stalls.js";
 import { applyBuildToPlayer } from "./character.js";
 import { changeClothes, changeFace, setCustomAppearance } from "./character-setup.js";
 import { processCustomClothesImage, processCustomFaceImage } from "./uploads.js";
@@ -38,7 +38,50 @@ export function applyActivityResult(result) {
 
 export const handleExternalGameResult = (result) => applyActivityResult(result);
 
+const ACTIVITY_PRESENTATION_DURATION = 2400;
+let activityPresentationTimer = null;
+
+export function clearActivityResultPresentation(presentation = gameState.session.presentation) {
+  if (presentation && gameState.session.presentation !== presentation) return false;
+  if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
+  gameState.session.presentation = null;
+  activityPresentationTimer = null;
+  render(gameState);
+  return true;
+}
+
+export function showActivityResultPresentation(stall, activity) {
+  if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
+  const presentation = {
+    type: "ACTIVITY_RESULT",
+    title: `${stall.name} 挑戰完成！`,
+    staminaDelta: activity.staminaDelta,
+    scoreDelta: activity.scoreDelta,
+    moneyDelta: activity.moneyDelta
+  };
+  gameState.session.presentation = presentation;
+  render(gameState);
+  activityPresentationTimer = setTimeout(() => clearActivityResultPresentation(presentation), ACTIVITY_PRESENTATION_DURATION);
+  activityPresentationTimer?.unref?.();
+  return presentation;
+}
+
+export function playTestGame(stallId) {
+  const stall = gameState.stalls.find((item) => item.id === stallId);
+  const result = TEST_GAME_RESULTS[stallId];
+  if (!stall || stall.type !== STALL_TYPES.GAME || !result) return false;
+  if (!getStallDisplayStatus(stall, gameState.environment).canEnter) return false;
+  const activity = applyActivityResult(result);
+  gameState.statistics.gamePlays[stall.id] = (gameState.statistics.gamePlays[stall.id] ?? 0) + 1;
+  gameState.statistics.stallVisits[stall.id] = (gameState.statistics.stallVisits[stall.id] ?? 0) + 1;
+  stall.life = Math.max(0, stall.life - 1);
+  showActivityResultPresentation(stall, activity);
+  return activity;
+}
+
 export function createNewGame(characterSettings = loadCharacterSettings() ?? {}) {
+  if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
+  activityPresentationTimer = null;
   resetGameState(characterSettings);
   changeScene(gameState, SCENES.NIGHT_MARKET);
   resetNightMarketScroll();
@@ -52,6 +95,8 @@ function resetNightMarketScroll() {
 
 export function startNightMarketFromHome(name = "") {
   const legacyAppearance = loadCharacterSettings() ?? {};
+  if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
+  activityPresentationTimer = null;
   resetGameState({ ...legacyAppearance, name, buildId: CONFIG.defaults.buildId });
   const saved = saveCharacterSettings(gameState.player);
   if (!saved.ok) {
@@ -99,7 +144,7 @@ function bindUI() {
       selectStallAndScroll(button.dataset.stallId);
       document.querySelector("#stall-detail-dialog")?.showModal();
     }
-    if (button.dataset.action === "enter-stall") showSelectedStallPlaceholder();
+    if (button.dataset.action === "enter-stall") enterSelectedStall();
     if (button.dataset.action === "go-home") document.querySelector("#home-dialog")?.showModal();
     if (button.dataset.action === "confirm-home") { button.closest("dialog")?.close(); changeScene(gameState, SCENES.RESULT); }
     if (button.dataset.sceneTarget) changeScene(gameState, button.dataset.sceneTarget);
@@ -164,6 +209,15 @@ export function showSelectedStallPlaceholder() {
   return copy;
 }
 
+export function enterSelectedStall() {
+  const stall = getSelectedStall(gameState);
+  if (stall?.type === STALL_TYPES.GAME && TEST_GAME_RESULTS[stall.id]) {
+    document.querySelector("#stall-detail-dialog")?.close();
+    return playTestGame(stall.id);
+  }
+  return showSelectedStallPlaceholder();
+}
+
 export function setStallClosed(stallId, isClosed) {
   const stall = gameState.stalls.find((item) => item.id === stallId);
   if (!stall) return false;
@@ -220,6 +274,7 @@ window.NMLDebug = Object.freeze({
   clearCharacterSettings,
   applyActivityResult,
   handleExternalGameResult,
+  playTestGame,
   changeScene: (scene) => changeScene(gameState, scene),
   selectStall: selectStallAndScroll,
   closeStall: (id) => setStallClosed(id, true),

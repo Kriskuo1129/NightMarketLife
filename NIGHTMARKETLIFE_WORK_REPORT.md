@@ -621,3 +621,37 @@ Legacy CHARACTER_SETUP、`character-renderer.js`、Face／Clothes Assets、Uploa
 `tests/core.test.mjs` 保留 Step 1 Core、Step 2 Legacy 與 Step 3 Core UI Revision，並新增空 Avatar fallback、Avatar Settings 保存、New Game 保留、1:1 Crop 規格、HOME → NIGHT_MARKET 與 RESULT Avatar Render 防回歸驗證，完整 PASS。專案仍不存在 `NIGHTMARKETLIFE_TECHNICAL_FUNCTIONAL_SPEC.md`，因此沒有建立或同步額外技術規格檔案。
 
 本次未開始 Step 4，未修改 Stall Gameplay、ActivityResult、Environment Gameplay、Build、裝備、刮刮樂、道具店、排行榜或 PK，也未刪除 Legacy Paper Doll。
+
+---
+
+# Step 4A：Minimum Gameplay Loop
+
+## Test Game Result Config
+
+在既有 `stalls.js` 新增 `TEST_GAME_RESULTS`，只定義 `game_01`、`game_02`、`game_03`。三攤固定結果依序為體力 -10／分數 +20／金錢 +50、體力 -10／分數 +10／金錢 +100、體力 -10／分數 +30／金錢 +20；全部使用 `completed: true`、`progressCost: 1`，`sourceId` 為 Stall ID。資料來源與 UI handler 分離，未來可直接用 External Game Result 取代測試資料。
+
+## Game Stall Modal 與 ActivityResult Flow
+
+三個營業中的 Game Stall 沿用既有 Stall Detail Modal，新增「遊玩需要：❤️ 體力 10」，不在主畫面 Stall Card 或進場 Modal公開固定獎勵。按下「前往攤位」後不切換 Scene，而是由共用 `playTestGame(stallId)` 再次確認 Stall 類型、Config 與可進入狀態，最後呼叫既有 `applyActivityResult()`。玩家體力、分數、金錢、`progress.actionCount`、`statistics.totalActions` 仍完全由 ActivityResult 流程更新，HUD 仍由 GameState render；Food、Management 與 Clothing 繼續走 Placeholder。
+
+## Statistics 與 Stall Life
+
+成功完成測試遊戲後，沿用既有 per-stall Schema 更新 `statistics.gamePlays[stallId]` 與 `statistics.stallVisits[stallId]`，各增加 1。該 Game Stall 的 `life` 同時減 1並以 0 為下限。本輪不因 Life = 0 自動收攤、不加入體力不足規則，也不觸發或重抽 Environment Event。
+
+## Temporary Result Presentation 與 Animation Stage Priority
+
+`gameState.session.presentation` 新增不持久化的 `ACTIVITY_RESULT` UI State，內容只有標題與三項 delta。存在時 Animation Stage 優先顯示「攤位挑戰完成」及 ❤️／⭐／💰 結果；結束後恢復目前 Environment 顯示，不修改 `environment.raining`、`mosquito`、`influencer` 或其他環境資料。結果只使用輕量 Fade／Pop，既有全域 `prefers-reduced-motion` 規則會將動畫縮短。
+
+## Timer Strategy
+
+Temporary Presentation 使用模組層級單一 Timer，顯示約 2.4 秒。新結果會先清除上一個 Timer；callback 同時以 presentation identity 驗證，避免舊 Timer 清除新結果。New Game／HOME 正式開始流程也會清除舊 Timer，Render 本身不建立 Timer。
+
+## Future External Game Replacement
+
+UI、Statistics、Life 與 Presentation 都集中在 `playTestGame()` 的單一路徑；`handleExternalGameResult()` 保留不動。未來接入 `NML_MoMaJohn` 時可將 `TEST_GAME_RESULTS` 的來源替換為 External Game Result，再沿用 ActivityResult 與後續完成流程，未建立 iframe、postMessage 或 Query Session。
+
+## Tests 與 Regression
+
+Core tests 新增三組固定結果、連續 HUD 資源結果、actionCount、totalActions、per-stall gamePlays／stallVisits、Stall Life -1、Life 不低於 0、非 Game Stall 不執行、Presentation 不修改 Environment，以及 Presentation 不寫入 Storage 的驗證。並保留 HOME、Avatar、HOME → NIGHT_MARKET、HUD、Stall Grid、Closed／Influencer Blocked、Home Card、RESULT、Legacy Character Setup 與 Storage 既有回歸測試。
+
+本輪只完成 Step 4A Minimum Gameplay Loop；尚未開始 4B Food Gameplay、4C Entry／Life 關店規則或 4D Environment Event Trigger，也未建立不存在的 Technical Functional Spec。
