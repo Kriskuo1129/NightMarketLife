@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 globalThis.localStorage = {
   values: new Map(),
@@ -111,8 +112,6 @@ assert.ok(stall.life >= CONFIG.stallLife.min && stall.life <= CONFIG.stallLife.m
 const achievement = createAchievement({ id: "test", name: "測試成就", rarity: ACHIEVEMENT_RARITIES.COMMON, description: "測試" });
 assert.equal(achievement.unlocked, false);
 
-console.log("NightMarketLife core tests: PASS");
-
 assert.equal(STALL_CONFIG.length, 7);
 assert.equal(gameState.stalls.length, 7);
 assert.equal(gameState.stalls.filter((item) => item.type === STALL_TYPES.GAME).length, 3);
@@ -133,12 +132,14 @@ assert.equal(selectStallAndScroll("missing-stall"), false);
 const normalView = getStallViewState(gameState.stalls[0], gameState.environment);
 assert.equal(normalView.canEnter, true);
 assert.ok(normalView.lifeText.startsWith("剩餘："));
+assert.equal(normalView.notice, "");
 const specialView = getStallViewState(gameState.stalls.find((item) => item.id === "management"), gameState.environment);
 assert.equal(specialView.lifeText, null);
 
 assert.equal(setStallClosed(firstStallId, true), true);
 assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).canEnter, false);
 assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).statusText, "休攤");
+assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).notice, "今天休攤。");
 setStallClosed(firstStallId, false);
 setInfluencer(true, firstStallId);
 assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).isBlocked, true);
@@ -161,3 +162,12 @@ assert.equal(completeCharacterSetup(), true);
 assert.equal(gameState.session.scene, "NIGHT_MARKET");
 assert.equal(gameState.progress.actionCount, 0);
 assert.equal(gameState.statistics.totalActions, 0);
+
+const nightMarketMarkup = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const nightMarketStyles = readFileSync(new URL("../style.css", import.meta.url), "utf8");
+assert.doesNotMatch(nightMarketMarkup, /id="market-title"|今晚逛哪一攤|data-stall-life-row|營業耐久/);
+assert.match(nightMarketMarkup, /下一攤去哪？/);
+assert.match(nightMarketMarkup, /id="stall-detail-dialog"/);
+assert.match(nightMarketStyles, /aspect-ratio:\s*16\s*\/\s*9/);
+
+console.log("NightMarketLife core tests: PASS");

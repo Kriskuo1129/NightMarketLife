@@ -154,14 +154,13 @@ export function renderNightMarket(gameState) {
     name: stall.name,
     description: stall.description,
     status: view.statusText,
-    life: view.lifeText ?? "",
-    notice: view.notice
+    reason: view.canEnter ? "" : view.notice
   };
   document.querySelectorAll("[data-selected-stall]").forEach((element) => {
     element.textContent = selectedValues[element.dataset.selectedStall] ?? "";
   });
-  const lifeRow = document.querySelector("[data-stall-life-row]");
-  if (lifeRow) lifeRow.hidden = stall.isSpecial;
-  const enterButton = document.querySelector('[data-action="enter-stall"]');
+  const reason = document.querySelector('[data-selected-stall="reason"]');
+  if (reason) reason.hidden = view.canEnter;
+  const enterButton = document.querySelector('#stall-detail-dialog [data-action="enter-stall"]');
   if (enterButton) enterButton.disabled = !view.canEnter;
 }

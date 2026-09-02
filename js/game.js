@@ -72,7 +72,10 @@ function bindUI() {
     if (button.dataset.cycle === "clothes") changeClothes(gameState.player, Number(button.dataset.direction));
     if (button.dataset.cycle) { setStatus(""); render(gameState); }
     if (button.dataset.action === "complete-character") completeCharacterSetup();
-    if (button.dataset.stallId) selectStallAndScroll(button.dataset.stallId);
+    if (button.dataset.stallId) {
+      selectStallAndScroll(button.dataset.stallId);
+      document.querySelector("#stall-detail-dialog")?.showModal();
+    }
     if (button.dataset.stallDirection) {
       const nextId = cycleStallId(gameState.stalls, gameState.session.selectedStallId, Number(button.dataset.stallDirection));
       if (nextId) selectStallAndScroll(nextId);
@@ -120,6 +123,7 @@ export function showSelectedStallPlaceholder() {
   const stall = getSelectedStall(gameState);
   const copy = getStallPlaceholderCopy(stall);
   const dialog = document.querySelector("#stall-dialog");
+  document.querySelector("#stall-detail-dialog")?.close();
   if (!dialog) return copy;
   dialog.querySelector("[data-stall-dialog-title]").textContent = copy.title;
   dialog.querySelector("[data-stall-dialog-message]").textContent = copy.message;

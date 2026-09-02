@@ -427,3 +427,47 @@ RESULT 顯示「結算功能將於後續 Step 實作」、玩家名稱及目前 
 ## 52. Step 4 尚未實作內容
 
 本次未實作正式 Game／Food／Work 活動、ActivityResult 資源變化、體力不足、價格、食物恢復、攤位 Life 扣除、夜市 Action 進度、4～6 Action 事件觸發、Rain／Mosquito／Influencer Gameplay、倍率效果、成就、服飾購買／效果、管理處功能、正式結算、NML_MoMaJohn、iframe 或 postMessage。下一步必須等待新指令後才可開始 Step 4。
+
+---
+
+# NightMarketLife Step 3 UI 收斂修改
+
+## 53. Night Market Header 移除
+
+NIGHT_MARKET 已移除最上方的 `Night Market`／`今晚的夜市` 標題區。畫面現在直接從體力、精彩分數與金錢 HUD 開始，Scene 仍以 `aria-label="夜市主畫面"` 保留可存取名稱。
+
+## 54. HUD 與 Environment 壓縮
+
+HUD 的上下 padding、欄位間距、數值 margin 與圓角均縮小。Environment Status 改成單行緊湊 Status Bar；正常只顯示「今晚一切正常」，事件仍以小型 Chip 顯示，資料來源與 Debug 行為未改。
+
+## 55. 16:9 Scene 與 Character 整體縮小
+
+Night Market Scene Area 改為完整主內容寬度的 `aspect-ratio: 16 / 9`。夜市角色由原本 9.5rem 縮為 6.2rem（320px 時 5.4rem），只改整個 Character Renderer Container 寬度；Face／Body 比例、top、Mask、Border Radius 與 z-index 完全沿用 Step 2 Character Asset Standard。
+
+## 56. 「下一攤去哪？」與 Stall Card 壓縮
+
+攤位標題由「今晚逛哪一攤？」改成「下一攤去哪？」。Carousel Card 從大型直式資訊卡改為扁平橫向選單，縮小 Icon、padding、行距與卡片寬高，保留合理觸控高度、Scroll Snap、Swipe、點擊及首尾循環箭頭。
+
+## 57. 固定 Stall Detail 移除與 Modal
+
+Carousel 下方原本長期佔位的 Selected Stall Detail 區已完全移除。點擊 Stall Card 現在會依序更新 `gameState.session.selectedStallId`、更新 Scene 方向招牌、將 Card 捲入視野，再開啟 Stall Detail Modal。左右箭頭只更新 Selected 並 Scroll，不會自動開 Modal；Swipe 後仍由玩家點擊 Card 開啟。
+
+## 58. Life UI 隱藏與提示簡化
+
+Modal 顯示 Icon、名稱、類型、簡短描述、營業狀態、進入與取消按鈕，不顯示 `life`、`maxLife`、營業耐久或剩餘次數。Stall Model 與 View State 的 Life 資料完整保留供 Step 4 使用。正常攤位不再顯示「可以進入看看」；只有 Closed 顯示「今天休攤。」、Influencer Blocked 顯示「網紅正在拍攝，暫時無法進入。」並停用進入按鈕。
+
+## 59. 手機畫面高度 Before / After
+
+390×844 實際量測：修改前 `document.body.scrollHeight = 1137`、`window.innerHeight = 844`；修改後 `document.body.scrollHeight = 844`、`window.innerHeight = 844`。頁面高度縮為原本約 74%，主要 HUD、Environment、16:9 Scene、Carousel 與回家操作可在單一 Viewport 內完成，不再需要頻繁上下滑動。
+
+## 60. Responsive 與 Console Test
+
+| Viewport | body scrollHeight | Scene Ratio | 整頁水平 Scroll | 結果 |
+| --- | ---: | ---: | --- | --- |
+| 320×844 | 844 | 16:9 | 無 | PASS |
+| 390×844 | 844 | 16:9 | 無 | PASS |
+| 430×932 | 932 | 16:9 | 無 | PASS |
+
+瀏覽器另確認：最上方直接為 HUD、舊標題不存在、Card 明顯變扁、固定 Detail 不存在、點 Card 開啟 Modal、Modal 不顯示 Life、正常攤位沒有可進入提示、箭頭不自動開 Modal、Enter Placeholder 不改資源、回家與 RESULT／HOME 流程正常。Console Error／Warning 為 0。核心測試新增 UI 結構防回歸檢查並完整 PASS。
+
+本次只進行 Step 3 UI 收斂；未開始 Step 4，未改變資源消耗、Action、Stall Life、事件、成就或正式結算邏輯。

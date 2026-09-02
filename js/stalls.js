@@ -47,7 +47,7 @@ export function getStallViewState(stall, environment) {
     canEnter: !stall.isClosed && !isBlocked,
     typeLabel: STALL_TYPE_LABELS[stall.type] ?? stall.type,
     statusText: stall.isClosed ? "休攤" : isBlocked ? "暫時無法進入" : "營業中",
-    notice: stall.isClosed ? "老闆今天先收攤了。" : isBlocked ? "網紅正在拍攝，暫時無法進入。" : "可以進入看看。",
+    notice: stall.isClosed ? "今天休攤。" : isBlocked ? "網紅正在拍攝，暫時無法進入。" : "",
     lifeText: stall.isSpecial ? null : "剩餘：" + stall.life
   };
 }

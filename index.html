@@ -6,7 +6,7 @@
   <meta name="description" content="NightMarketLife 夜市人生：創造屬於你的精彩一夜。">
   <title>NightMarketLife 夜市人生</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=step3-ui-density">
 </head>
 <body>
   <main id="app">
@@ -44,9 +44,8 @@
       <button class="primary-button" type="button" data-action="complete-character">完成</button>
     </section>
 
-    <section class="scene market-scene" data-scene="NIGHT_MARKET" aria-labelledby="market-title" hidden>
+    <section class="scene market-scene" data-scene="NIGHT_MARKET" aria-label="夜市主畫面" hidden>
       <header class="market-hud">
-        <div class="hud-title"><p class="eyebrow">Night Market</p><h2 id="market-title">今晚的夜市</h2></div>
         <dl class="hud-stats" aria-label="玩家狀態">
           <div><dt>❤️ 體力</dt><dd data-player="stamina"></dd></div>
           <div><dt>⭐ 精彩分數</dt><dd data-player="score"></dd></div>
@@ -69,16 +68,8 @@
       </div>
 
       <section class="stall-browser" aria-labelledby="stall-browser-title">
-        <div class="section-heading"><div><p class="eyebrow">Stalls</p><h3 id="stall-browser-title">今晚逛哪一攤？</h3></div><div class="carousel-arrows"><button type="button" data-stall-direction="-1" aria-label="上一個攤位">←</button><button type="button" data-stall-direction="1" aria-label="下一個攤位">→</button></div></div>
+        <div class="section-heading"><h3 id="stall-browser-title">下一攤去哪？</h3><div class="carousel-arrows"><button type="button" data-stall-direction="-1" aria-label="上一個攤位">←</button><button type="button" data-stall-direction="1" aria-label="下一個攤位">→</button></div></div>
         <div class="stall-carousel" data-stall-carousel role="list" aria-label="夜市攤位"></div>
-      </section>
-
-      <section class="selected-stall-panel" aria-labelledby="selected-stall-title">
-        <div class="selected-stall-heading"><span class="selected-stall-icon" data-selected-stall="icon" aria-hidden="true"></span><div><p class="stall-type" data-selected-stall="type"></p><h3 id="selected-stall-title" data-selected-stall="name"></h3></div></div>
-        <p data-selected-stall="description"></p>
-        <dl class="stall-details"><div><dt>營業狀態</dt><dd data-selected-stall="status"></dd></div><div data-stall-life-row><dt>營業耐久</dt><dd data-selected-stall="life"></dd></div></dl>
-        <p class="stall-notice" data-selected-stall="notice"></p>
-        <button class="primary-button" type="button" data-action="enter-stall">進入攤位</button>
       </section>
       <button class="go-home-button" type="button" data-action="go-home">回家</button>
     </section>
@@ -94,6 +85,7 @@
 
   <dialog id="build-dialog" aria-labelledby="build-dialog-title"><div class="dialog-card"><div class="dialog-heading"><h2 id="build-dialog-title">選擇角色 Build</h2><button type="button" data-close-dialog aria-label="關閉">×</button></div><div class="build-options" data-build-options></div></div></dialog>
   <dialog id="pro-dialog" aria-labelledby="pro-dialog-title"><div class="dialog-card compact-dialog"><p class="pro-badge">PRO</p><h2 id="pro-dialog-title">僅限 PRO 會員使用</h2><p>這只是夜市老闆開的玩笑，目前沒有真正的會員系統。</p><button class="primary-button" type="button" data-close-dialog>知道了</button></div></dialog>
+  <dialog id="stall-detail-dialog" class="stall-detail-dialog" aria-labelledby="stall-detail-title"><div class="dialog-card"><div class="stall-modal-heading"><span class="selected-stall-icon" data-selected-stall="icon" aria-hidden="true"></span><div><p class="stall-type" data-selected-stall="type"></p><h2 id="stall-detail-title" data-selected-stall="name"></h2></div></div><p data-selected-stall="description"></p><p class="stall-status"><span>營業狀態：</span><strong data-selected-stall="status"></strong></p><p class="stall-block-reason" data-selected-stall="reason" hidden></p><div class="stall-modal-actions"><button type="button" data-close-dialog>取消</button><button class="primary-button" type="button" data-action="enter-stall">進入攤位</button></div></div></dialog>
   <dialog id="stall-dialog" aria-labelledby="stall-dialog-title"><div class="dialog-card compact-dialog"><p class="pro-badge">準備中</p><h2 id="stall-dialog-title" data-stall-dialog-title>老闆還在準備中！</h2><p data-stall-dialog-message>攤位功能將於 Step 4 實作。</p><button class="primary-button" type="button" data-close-dialog>繼續逛</button></div></dialog>
   <dialog id="home-dialog" aria-labelledby="home-dialog-title">
     <div class="dialog-card compact-dialog">
@@ -106,6 +98,6 @@
       </div>
     </div>
   </dialog>
-  <script type="module" src="js/game.js"></script>
+  <script type="module" src="js/game.js?v=step3-ui-density"></script>
 </body>
 </html>
