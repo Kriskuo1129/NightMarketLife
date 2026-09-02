@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="description" content="NightMarketLife 場景式遊戲 UI 版型比較 Prototype">
+  <title>NightMarketLife Scene UI Prototype</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='.9em' font-size='56'%3E🏮%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="prototype-shell">
+    <header class="prototype-header">
+      <div><p class="kicker">NightMarketLife · UI Prototype</p><h1>場景式遊戲 UI</h1></div>
+      <p>只比較 Layout、Hierarchy 與 Gameplay Feeling</p>
+    </header>
+
+    <nav class="variant-tabs" aria-label="版型方案">
+      <button type="button" data-variant-target="a" aria-pressed="true"><strong>A</strong><span>純場景型</span></button>
+      <button type="button" data-variant-target="b" aria-pressed="false"><strong>B</strong><span>場景＋底部操作</span></button>
+      <button type="button" data-variant-target="c" aria-pressed="false"><strong>C</strong><span>集中式遊戲型</span></button>
+    </nav>
+
+    <div class="phone-preview">
+      <section class="variant variant-a is-active" data-variant="a" aria-label="A 純場景型">
+        <div class="scene-world scene-world-a">
+          <div class="floating-hud" aria-label="玩家狀態"><span>❤️ <b>100 / 100</b></span><span>⭐ <b>0</b></span><span>💰 <b>1000</b></span></div>
+          <p class="weather-line">今晚一切正常。</p>
+          <div class="bulbs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="world-stalls" data-world-stalls></div>
+          <div class="player player-a"><i class="player-head"></i><i class="player-body"></i><strong>Kris</strong></div>
+          <div class="scene-command"><p>下一攤去哪？</p><div><button type="button" data-cycle="-1" aria-label="上一攤">‹</button><span data-selected-name>摸麻將</span><button type="button" data-cycle="1" aria-label="下一攤">›</button></div></div>
+          <button class="home-link" type="button" data-home>回家</button>
+        </div>
+      </section>
+
+      <section class="variant variant-b" data-variant="b" aria-label="B 場景加底部操作型" hidden>
+        <div class="game-hud"><span>❤️ 100 / 100</span><span>⭐ 0</span><span>💰 1000</span></div>
+        <p class="status-strip">🏮 今晚一切正常。</p>
+        <div class="scene-world scene-world-b">
+          <div class="bulbs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="backdrop-stalls" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div class="player"><i class="player-head"></i><i class="player-body"></i><strong>Kris</strong></div>
+        </div>
+        <div class="bottom-command">
+          <p>下一攤去哪？</p>
+          <div class="stall-stepper"><button type="button" data-cycle="-1" aria-label="上一攤">‹</button><button class="stall-name-button" type="button" data-open-selected data-selected-name>摸麻將</button><button type="button" data-cycle="1" aria-label="下一攤">›</button></div>
+          <button class="go-button" type="button" data-open-selected>前往</button>
+        </div>
+        <button class="home-link footer-home" type="button" data-home>回家</button>
+      </section>
+
+      <section class="variant variant-c" data-variant="c" aria-label="C 集中式遊戲型" hidden>
+        <div class="compact-game-bar"><span><small>體力</small>❤️ 100 / 100</span><span><small>精彩</small>⭐ 0</span><span><small>金錢</small>💰 1000</span></div>
+        <div class="rule"></div>
+        <div class="scene-world scene-world-c">
+          <div class="bulbs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          <p class="scene-label">瑞豐夜市 · 今晚一切正常</p>
+          <div class="backdrop-stalls" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div class="player"><i class="player-head"></i><i class="player-body"></i><strong>Kris</strong></div>
+        </div>
+        <div class="rule"></div>
+        <div class="focused-command">
+          <p>下一攤去哪？</p>
+          <div class="stall-stepper"><button type="button" data-cycle="-1" aria-label="上一攤">‹</button><strong data-selected-name>摸麻將</strong><button type="button" data-cycle="1" aria-label="下一攤">›</button></div>
+          <button class="go-button" type="button" data-open-selected>進入</button>
+        </div>
+        <div class="thin-rule"></div>
+        <button class="home-link footer-home" type="button" data-home>回家</button>
+      </section>
+    </div>
+  </main>
+
+  <dialog id="stall-dialog" aria-labelledby="stall-title">
+    <div class="popup-content"><button class="popup-close" type="button" data-close aria-label="關閉">×</button><span class="popup-icon" data-popup-icon>🀄</span><p data-popup-type>遊戲攤</p><h2 id="stall-title" data-popup-name>摸麻將</h2><p data-popup-description>試試今晚的手氣？</p><div class="popup-actions"><button type="button" data-close>取消</button><button class="primary-action" type="button" data-enter>進入攤位</button></div></div>
+  </dialog>
+  <dialog id="message-dialog" aria-labelledby="message-title"><div class="popup-content message-popup"><button class="popup-close" type="button" data-close aria-label="關閉">×</button><span class="popup-icon">🏮</span><h2 id="message-title">Prototype only</h2><p data-message>這裡只展示版型，不會執行正式遊戲功能。</p><button class="primary-action" type="button" data-close>知道了</button></div></dialog>
+  <script src="preview.js"></script>
+</body>
+</html>

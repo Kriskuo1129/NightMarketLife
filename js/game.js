@@ -2,7 +2,7 @@ import { CONFIG, getBuildById } from "./config.js";
 import { gameState, resetGameState } from "./state.js";
 import { clearCharacterSettings, loadCharacterSettings, saveCharacterSettings } from "./storage.js";
 import { SCENES, changeScene, getSelectedStall, render, renderBuildOptions, scrollSelectedStallIntoView, selectStall, setStatus } from "./ui.js";
-import { cycleStallId, STALL_CONFIG, STALL_TYPES } from "./stalls.js";
+import { STALL_CONFIG, STALL_TYPES } from "./stalls.js";
 import { applyBuildToPlayer } from "./character.js";
 import { changeClothes, changeFace, setCustomAppearance } from "./character-setup.js";
 import { processCustomClothesImage, processCustomFaceImage } from "./uploads.js";
@@ -40,7 +40,22 @@ export const handleExternalGameResult = (result) => applyActivityResult(result);
 
 export function createNewGame(characterSettings = loadCharacterSettings() ?? {}) {
   resetGameState(characterSettings);
-  changeScene(gameState, SCENES.CHARACTER_SETUP);
+  changeScene(gameState, SCENES.NIGHT_MARKET);
+  resetNightMarketScroll();
+  return gameState;
+}
+
+function resetNightMarketScroll() {
+  const grid = document.querySelector("[data-stall-grid]");
+  if (grid) grid.scrollTop = 0;
+}
+
+export function startNightMarketFromHome(name = "") {
+  const legacyAppearance = loadCharacterSettings() ?? {};
+  resetGameState({ ...legacyAppearance, name, buildId: CONFIG.defaults.buildId });
+  setStatus("");
+  changeScene(gameState, SCENES.NIGHT_MARKET);
+  resetNightMarketScroll();
   return gameState;
 }
 
@@ -48,11 +63,8 @@ function bindUI() {
   document.addEventListener("submit", (event) => {
     if (event.target.id !== "home-form") return;
     event.preventDefault();
-    const saved = loadCharacterSettings() ?? {};
     const name = new FormData(event.target).get("playerName") ?? "";
-    resetGameState({ ...saved, name });
-    setStatus("");
-    changeScene(gameState, SCENES.CHARACTER_SETUP);
+    startNightMarketFromHome(name);
   });
   document.addEventListener("click", (event) => {
     const button = event.target.closest("button");
@@ -75,10 +87,6 @@ function bindUI() {
     if (button.dataset.stallId) {
       selectStallAndScroll(button.dataset.stallId);
       document.querySelector("#stall-detail-dialog")?.showModal();
-    }
-    if (button.dataset.stallDirection) {
-      const nextId = cycleStallId(gameState.stalls, gameState.session.selectedStallId, Number(button.dataset.stallDirection));
-      if (nextId) selectStallAndScroll(nextId);
     }
     if (button.dataset.action === "enter-stall") showSelectedStallPlaceholder();
     if (button.dataset.action === "go-home") document.querySelector("#home-dialog")?.showModal();

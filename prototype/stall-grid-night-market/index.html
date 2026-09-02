@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1b1210">
+  <title>NightMarketLife｜Stall Grid Prototype</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="preview-workspace">
+    <aside class="prototype-controls" aria-label="Prototype Controls">
+      <p class="eyebrow">Layout Prototype</p>
+      <h1>Prototype Controls</h1>
+      <p>僅用於切換事件舞台內容，不屬於正式遊戲畫面。</p>
+      <fieldset>
+        <legend>Animation Stage</legend>
+        <div class="control-grid">
+          <button type="button" data-event="normal" aria-pressed="true">正常</button>
+          <button type="button" data-event="rain">下雨</button>
+          <button type="button" data-event="crowd">人潮</button>
+          <button type="button" data-event="influencer">網紅</button>
+          <button type="button" data-event="mosquito">蚊子</button>
+          <button type="button" data-event="result">事件結果</button>
+        </div>
+      </fieldset>
+      <dl>
+        <div><dt>固定區</dt><dd>HUD＋事件舞台</dd></div>
+        <div><dt>捲動區</dt><dd>攤位 Grid</dd></div>
+        <div><dt>設計基準</dt><dd>390 × 900</dd></div>
+      </dl>
+    </aside>
+
+    <section class="game-screen" aria-label="夜市主畫面 Prototype">
+      <header class="hud" aria-label="玩家資源">
+        <div class="hud-item"><span class="hud-label">體力</span><strong><span aria-hidden="true">❤️</span> 70</strong></div>
+        <div class="hud-item"><span class="hud-label">精彩分數</span><strong><span aria-hidden="true">⭐</span> 1300</strong></div>
+        <div class="hud-item"><span class="hud-label">金錢</span><strong><span aria-hidden="true">💰</span> 900</strong></div>
+      </header>
+
+      <section class="event-stage" data-stage-state="normal" aria-live="polite" aria-label="夜市事件舞台">
+        <div class="stage-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="stage-visual" aria-hidden="true">
+          <div class="rain-lines"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="crowd-dots"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="influencer-flash"><i></i><i></i><i></i></div>
+          <div class="mosquito-dots"><i></i><i></i><i></i><i></i></div>
+          <div class="result-glow"></div>
+        </div>
+        <div class="stage-copy">
+          <span class="stage-kicker">今晚的夜市</span>
+          <strong id="stage-message">今晚的夜市十分熱鬧</strong>
+        </div>
+      </section>
+
+      <section class="stall-area" aria-labelledby="stall-heading">
+        <div class="stall-area-heading"><h2 id="stall-heading">今晚要去哪一攤？</h2><span>向下滑動探索</span></div>
+        <div class="stall-grid" id="stall-grid" tabindex="0" role="region" aria-label="攤位清單，可上下滑動"></div>
+      </section>
+    </section>
+  </main>
+
+  <dialog class="modal" id="stall-modal">
+    <div class="modal-panel">
+      <p class="eyebrow">攤位入口</p>
+      <h2 id="modal-title"></h2>
+      <p class="modal-status" id="modal-status"></p>
+      <p id="modal-message"></p>
+      <div class="modal-actions" id="modal-actions"></div>
+    </div>
+  </dialog>
+
+  <script src="preview.js"></script>
+</body>
+</html>

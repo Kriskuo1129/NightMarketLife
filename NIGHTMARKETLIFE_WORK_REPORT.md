@@ -507,6 +507,72 @@ Character Setup 與 Night Market 仍共用 `character-renderer.js` 及同一套 
 
 - NIGHT_MARKET 最上方直接顯示 HUD，Environment、16:9 Scene、角色、Carousel、回家與 Stall Modal 均正常。
 - CHARACTER_SETUP 的名稱、Preview、Face／Clothes Picker、Upload、Build 與完成按鈕均正常顯示及操作。
+
+---
+
+# Core UI Revision：Stall Grid Night Market
+
+## Revision 目的與 Paper Doll 主流程調整
+
+正式 NIGHT_MARKET 已採用 `prototype/stall-grid-night-market/` 驗證通過的資訊架構，改為固定 HUD、固定 Animation Stage、可獨立捲動的 Stall Grid。Paper Doll 不再是正式 Gameplay 的核心，也不再出現在 NIGHT_MARKET；此調整讓「玩家資源」、「夜市目前事件」與「下一步目的地」三種資訊各自擁有明確區域。
+
+`CHARACTER_SETUP` Scene、`character-renderer.js`、Face／Clothes Assets、Upload 與 Storage 欄位均保留作為 Legacy 實作，沒有刪除、Migration 或清除玩家既有 LocalStorage。Character Renderer 只在 Legacy Character Setup 仍有對應 Host 時運作，不再阻擋正常 Gameplay Flow。
+
+## HOME → NIGHT_MARKET 新流程與 Default Build
+
+正常流程由 `HOME → CHARACTER_SETUP → NIGHT_MARKET` 改為 `HOME → NIGHT_MARKET`。玩家名稱仍由 HOME 表單取得，空白名稱仍透過既有顯示規則呈現 `-沒輸入名稱-`。
+
+HOME 開始時會以 `CONFIG.defaults.buildId` 初始化玩家；目前值為 `worker`（社會人），初始體力 100、金錢 1000。舊 Character Settings 的 Appearance 欄位可繼續存在，但 Build 暫時固定使用 Default，不新增 Build Picker。`createNewGame(settings)` 亦直接進入 NIGHT_MARKET，仍允許測試或 Debug 明確傳入合法 Build。
+
+## 新 HUD
+
+HUD 沿用 Prototype 的緊湊三欄 Layout，只讀取並顯示正式 `player.stamina / player.maxStamina`、`player.score`、`player.money`。沒有玩家名稱、Avatar、Paper Doll、裝備、Build、環境文字、時間或設定按鈕，也沒有大型資源 Card。
+
+## Animation Stage
+
+Animation Stage 正式接入既有 Environment。主要訊息採穩定優先序：下雨、網紅、蚊子、人潮、正常；多個環境可同時存在時，只顯示一個 Primary Message，但雨線、人潮、網紅閃光與蚊子等 CSS Layer 可依正式 Boolean 狀態同時疊加。本輪沒有建立新的 Event System，也沒有產生任何 Gameplay Effect。
+
+## Stall Grid 與 Stall Status Abstraction
+
+Stall Grid 完全由 `gameState.stalls` 產生，目前仍是 Config 既有的 7 個正式攤位，沒有因 Prototype 加入刮刮樂、道具店或夾娃娃機。每張 Card 僅顯示攤位名稱與可直接閱讀的狀態，沒有 Icon、Emoji、類型、描述、Life、價格、體力、獎勵或進入提示。
+
+新增 `getStallDisplayStatus(stall, environment)` 作為統一顯示入口，回傳 `code`、`label`、`canEnter` 與既有相容欄位。目前正式狀態為：
+
+- `OPEN` → `營業中`，可進入 Placeholder。
+- `CLOSED` → `今日公休`，不可進入。
+- `INFLUENCER_BLOCKED` → `網紅佔領中`，不可進入。
+
+`getStallViewState` 保留為相容 Alias，避免舊測試或後續程式立即失效。Card DOM 已預留 `--stall-image` Background Image Layer，並以單一 Bottom Gradient 保持未來圖片上的文字可讀性，沒有 Card inside Card。
+
+## Home Card 與既有回家流程
+
+「回家／結束今晚行程」由 UI 層額外產生，不加入 `gameState.stalls`，固定放在 Stall Grid 最後並跨滿一列。點擊後沿用既有 Confirmation；「繼續逛」停留 NIGHT_MARKET，「回家」前往既有 RESULT Placeholder，沒有重新設計結算。
+
+## Scroll Architecture
+
+正式 `.market-scene` 使用垂直 Flex Layout。HUD 與 Animation Stage 設為不可壓縮的固定區；`.stall-browser` 與 `.stall-grid` 使用 `min-height: 0`、`flex: 1`，只有 `.stall-grid` 設定 `overflow-y: auto` 與 `overscroll-behavior: contain`。主畫面高度依 `100dvh` 與可用空間計算，不依賴 390×900 Magic Pixel，也不使用 Body Scroll 完成 Gameplay 捲動。
+
+## Debug 相容策略
+
+`window.NMLDebug` 的 `closeStall`、`openStall`、`setRain`、`setMosquito`、`setInfluencer` 與 `render` 均保留，修改後會立即反映 Card Status 或 Animation Stage。`selectStall` 保留為 Legacy Debug 行為，不再驅動 Carousel，也不會因 Carousel 淘汰而產生錯誤。
+
+## 本輪明確未實作
+
+- 未實作 Avatar Upload。
+- 未實作 Equipment System。
+- 未新增刮刮樂、道具店或夾娃娃機正式功能。
+- 未執行任何攤位 Gameplay 資源變化。
+- 未修改 Storage Schema。
+- 未開始 Step 4 Resource／Stall Life。
+
+## Responsive 與 Regression 測試結果
+
+- `tests/core.test.mjs`：`NightMarketLife core tests: PASS`。
+- HOME 直接進 NIGHT_MARKET、Default Build、統一 Stall Status、Environment Stage View、負數 scoreDelta 保護及既有 Step 1～3 核心測試：PASS。
+- 瀏覽器尺寸 320×844、390×844、390×900、430×932：全部維持兩欄、無水平 Overflow、Body 不產生 Gameplay Scroll，且同屏可看到 7～8 張 Card。390×900 實際滑動 Stall Grid 時 `scrollTop` 由 0 移至 139，Body 保持 0，HUD 與 Animation Stage 座標完全不變。
+- 瀏覽器流程 HOME → NIGHT_MARKET（未經 CHARACTER_SETUP）、正常攤位 Modal、Home Confirmation → RESULT → HOME：PASS。
+- Gameplay 資源回歸：進入攤位 Modal 與回家前後維持體力 100/100、分數 0、金錢 1000，未增加 Action、未扣 Stall Life；Console 無 Error／Warning。
+- 專案中不存在 `NIGHTMARKETLIFE_TECHNICAL_FUNCTIONAL_SPEC.md`，因此本輪沒有可同步更新的技術規格檔案。
 - 四種指定 Viewport 均無 body 水平 Overflow。
 - 瀏覽器 Console Error／Warning：0。
 - `tests/core.test.mjs`：`NightMarketLife core tests: PASS`。

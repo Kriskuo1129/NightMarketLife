@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="description" content="NightMarketLife 第一人稱夜市場景 UI Prototype">
+  <title>First-person Night Market Prototype</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='.9em' font-size='56'%3E🏮%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="prototype-layout">
+    <aside class="prototype-controls" aria-labelledby="controls-title">
+      <p class="prototype-label">Layout Preview</p>
+      <h1 id="controls-title">Prototype Controls</h1>
+      <p>這些按鈕只用於比較場景狀態，不屬於正式遊戲 UI。</p>
+      <fieldset><legend>Environment</legend><div class="environment-buttons">
+        <button type="button" data-environment="normal" aria-pressed="true">正常</button>
+        <button type="button" data-environment="rain" aria-pressed="false">下雨</button>
+        <button type="button" data-environment="crowded" aria-pressed="false">人潮爆滿</button>
+        <button type="button" data-environment="influencer" aria-pressed="false">網紅</button>
+        <button type="button" data-environment="mosquito" aria-pressed="false">蚊子</button>
+        <button type="button" data-environment="mixed" aria-pressed="false">混合狀態</button>
+      </div></fieldset>
+      <button class="settlement-preview-button" type="button" data-settlement>查看結算示意</button>
+      <dl class="reading-order"><div><dt>第一視線</dt><dd>夜市場景</dd></div><div><dt>第二視線</dt><dd>HUD</dd></div><div><dt>第三視線</dt><dd>攤位操作</dd></div><div><dt>第四視線</dt><dd>裝備</dd></div></dl>
+    </aside>
+
+    <section class="phone" aria-label="第一人稱夜市手機預覽">
+      <header class="game-hud">
+        <div class="resource-strip" aria-label="玩家資源"><span>❤️ <b>100 / 100</b></span><span>⭐ <b>0</b></span><span>💰 <b>1000</b></span></div>
+        <div class="equipment-strip" aria-label="裝備欄"><small>🎒 裝備</small><button type="button" data-equipment="raincoat" aria-label="輕便雨衣">☔</button><button type="button" data-equipment="slippers" aria-label="夜市拖鞋">🩴</button><button type="button" data-equipment="empty" aria-label="空裝備格">－</button></div>
+      </header>
+
+      <div class="night-market-scene" data-scene data-environment-state="normal">
+        <div class="scene-base" aria-hidden="true">
+          <div class="night-sky"></div>
+          <div class="light-string"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="far-market"><span>夜市口</span><i></i><i></i><i></i></div>
+          <div class="road"></div>
+          <button class="scene-stall stall-left" type="button" data-scene-stall="0"><span>🀄</span><strong>摸麻將</strong></button>
+          <button class="scene-stall stall-right" type="button" data-scene-stall="3"><span>🍗</span><strong>鹹酥雞</strong></button>
+          <button class="scene-stall stall-far" type="button" data-scene-stall="1"><span>🎮</span><strong>彈珠台</strong></button>
+          <div class="signs"><i>飲料</i><i>夾娃娃</i><i>刮刮樂</i></div>
+        </div>
+        <div class="scene-crowd" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="scene-weather" aria-hidden="true"><div class="rain-lines"></div><i class="umbrella umbrella-one">☂</i><i class="umbrella umbrella-two">☂</i></div>
+        <div class="scene-event" aria-hidden="true"><div class="influencer-cluster"><span>📱</span><b>✨</b><i></i><i></i><i></i></div></div>
+        <div class="scene-fx" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <div class="focus-marker"><small>目前看向</small><strong data-focused-stall>摸麻將</strong></div>
+      </div>
+
+      <section class="command-area" aria-labelledby="command-title">
+        <p id="command-title">下一攤去哪？</p>
+        <div class="stall-stepper"><button type="button" data-cycle="-1" aria-label="上一攤">‹</button><strong data-selected-stall>摸麻將</strong><button type="button" data-cycle="1" aria-label="下一攤">›</button></div>
+        <button class="primary-button" type="button" data-go>前往</button>
+        <button class="home-button" type="button" data-home>回家</button>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="equipment-dialog" aria-labelledby="equipment-title"><div class="dialog-content"><button class="dialog-close" type="button" data-close aria-label="關閉">×</button><span class="dialog-icon" data-equipment-icon>☔</span><p data-equipment-rarity>普通</p><h2 id="equipment-title" data-equipment-name>輕便雨衣</h2><p data-equipment-effect>下雨時降低負面影響。</p><button class="primary-button" type="button" data-close>知道了</button></div></dialog>
+  <dialog id="stall-dialog" aria-labelledby="stall-title"><div class="dialog-content"><button class="dialog-close" type="button" data-close aria-label="關閉">×</button><span class="dialog-icon" data-stall-icon>🀄</span><p data-stall-type>遊戲攤</p><h2 id="stall-title" data-stall-name>摸麻將</h2><p data-stall-description>今晚要不要試試手氣？</p><div class="dialog-actions"><button type="button" data-close>取消</button><button class="primary-button" type="button" data-enter>進入攤位</button></div></div></dialog>
+  <dialog id="home-dialog" aria-labelledby="home-title"><div class="dialog-content"><span class="dialog-icon">🏠</span><h2 id="home-title">今晚就先回家嗎？</h2><p>Prototype 不會真的離開夜市。</p><div class="dialog-actions"><button type="button" data-close>繼續逛</button><button class="primary-button" type="button" data-confirm-home>回家</button></div></div></dialog>
+  <dialog id="settlement-dialog" aria-labelledby="settlement-title"><div class="dialog-content settlement-content"><button class="dialog-close" type="button" data-close aria-label="關閉">×</button><div class="avatar-placeholder" aria-hidden="true"></div><h2 id="settlement-title">Kris</h2><p>精彩分數</p><strong class="final-score">850</strong><p>今晚獲得</p><strong class="achievement">🏆 夜市冒險家</strong><button class="primary-button" type="button" data-close>關閉示意</button></div></dialog>
+  <dialog id="message-dialog" aria-labelledby="message-title"><div class="dialog-content"><span class="dialog-icon">🏮</span><h2 id="message-title">Prototype only</h2><p data-message>這裡只展示 UI，不會執行正式遊戲功能。</p><button class="primary-button" type="button" data-close>知道了</button></div></dialog>
+  <script src="preview.js"></script>
+</body>
+</html>

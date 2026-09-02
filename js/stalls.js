@@ -38,19 +38,39 @@ export function createStall(definition) {
 
 export const createInitialStalls = () => STALL_CONFIG.map(createStall);
 
-export function getStallViewState(stall, environment) {
+export const STALL_DISPLAY_STATUS = Object.freeze({
+  OPEN: "OPEN",
+  CLOSED: "CLOSED",
+  INFLUENCER_BLOCKED: "INFLUENCER_BLOCKED"
+});
+
+export function getStallDisplayStatus(stall, environment) {
   if (!stall) return null;
   const isBlocked = Boolean(stall.isBlocked || stall.id === environment.influencerBlockedStallId);
+  const code = stall.isClosed
+    ? STALL_DISPLAY_STATUS.CLOSED
+    : isBlocked
+      ? STALL_DISPLAY_STATUS.INFLUENCER_BLOCKED
+      : STALL_DISPLAY_STATUS.OPEN;
   return {
+    code,
+    label: code === STALL_DISPLAY_STATUS.CLOSED
+      ? "今日公休"
+      : code === STALL_DISPLAY_STATUS.INFLUENCER_BLOCKED
+        ? "網紅佔領中"
+        : "營業中",
     isClosed: stall.isClosed,
     isBlocked,
     canEnter: !stall.isClosed && !isBlocked,
     typeLabel: STALL_TYPE_LABELS[stall.type] ?? stall.type,
-    statusText: stall.isClosed ? "休攤" : isBlocked ? "暫時無法進入" : "營業中",
+    statusText: code === STALL_DISPLAY_STATUS.CLOSED ? "今日公休" : code === STALL_DISPLAY_STATUS.INFLUENCER_BLOCKED ? "網紅佔領中" : "營業中",
     notice: stall.isClosed ? "今天休攤。" : isBlocked ? "網紅正在拍攝，暫時無法進入。" : "",
     lifeText: stall.isSpecial ? null : "剩餘：" + stall.life
   };
 }
+
+// Step 3 compatibility alias. New UI code uses getStallDisplayStatus().
+export const getStallViewState = getStallDisplayStatus;
 
 export function cycleStallId(stalls, selectedStallId, direction) {
   if (!stalls.length) return null;

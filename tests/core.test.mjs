@@ -16,10 +16,11 @@ globalThis.document = {
 globalThis.window = {};
 
 const { CONFIG } = await import("../js/config.js");
-const { createStall, cycleStallId, getStallViewState, STALL_CONFIG, STALL_TYPES, INTERACTION_TYPES } = await import("../js/stalls.js");
+const { createStall, cycleStallId, getStallDisplayStatus, getStallViewState, STALL_CONFIG, STALL_DISPLAY_STATUS, STALL_TYPES, INTERACTION_TYPES } = await import("../js/stalls.js");
 const { createAchievement, ACHIEVEMENT_RARITIES } = await import("../js/achievements.js");
 const { gameState } = await import("../js/state.js");
-const { createNewGame, applyActivityResult, completeCharacterSetup, getStallPlaceholderCopy, selectStallAndScroll, setEnvironmentFlag, setInfluencer, setStallClosed } = await import("../js/game.js");
+const { createNewGame, applyActivityResult, completeCharacterSetup, getStallPlaceholderCopy, selectStallAndScroll, setEnvironmentFlag, setInfluencer, setStallClosed, startNightMarketFromHome } = await import("../js/game.js");
+const { getEnvironmentStageView } = await import("../js/ui.js");
 const { applyBuildToPlayer, getPlayerDisplayName } = await import("../js/character.js");
 const { cycleAsset, changeClothes, changeFace, setCustomAppearance } = await import("../js/character-setup.js");
 const { FACE_ASSETS, DEFAULT_CLOTHES, SHOP_CLOTHES } = await import("../assets/character-assets.js");
@@ -36,6 +37,7 @@ assert.deepEqual(CONFIG.characterBuilds.map(({ name, stamina, money }) => ({ nam
 ]);
 
 createNewGame({ name: "測試者", buildId: "high-school" });
+assert.equal(gameState.session.scene, "NIGHT_MARKET");
 assert.equal(gameState.player.maxStamina, 120);
 assert.equal(gameState.environment.crowdLevel, 3);
 assert.ok(gameState.progress.nextEventAt >= 4 && gameState.progress.nextEventAt <= 6);
@@ -107,6 +109,12 @@ assert.equal(gameState.player.money, 1000);
 assert.equal(getPlayerDisplayName(gameState.player), "-沒輸入名稱-");
 assert.equal(gameState.player.buildId, "worker");
 
+startNightMarketFromHome("首頁玩家");
+assert.equal(gameState.session.scene, "NIGHT_MARKET");
+assert.equal(gameState.player.name, "首頁玩家");
+assert.equal(gameState.player.buildId, CONFIG.defaults.buildId);
+assert.equal(gameState.player.money, 1000);
+
 const stall = createStall({ id: "test", name: "測試攤", type: STALL_TYPES.GAME, interactionType: INTERACTION_TYPES.GAME });
 assert.ok(stall.life >= CONFIG.stallLife.min && stall.life <= CONFIG.stallLife.max);
 const achievement = createAchievement({ id: "test", name: "測試成就", rarity: ACHIEVEMENT_RARITIES.COMMON, description: "測試" });
@@ -131,6 +139,8 @@ assert.equal(selectStallAndScroll("missing-stall"), false);
 
 const normalView = getStallViewState(gameState.stalls[0], gameState.environment);
 assert.equal(normalView.canEnter, true);
+assert.equal(normalView.code, STALL_DISPLAY_STATUS.OPEN);
+assert.equal(normalView.label, "營業中");
 assert.ok(normalView.lifeText.startsWith("剩餘："));
 assert.equal(normalView.notice, "");
 const specialView = getStallViewState(gameState.stalls.find((item) => item.id === "management"), gameState.environment);
@@ -138,12 +148,14 @@ assert.equal(specialView.lifeText, null);
 
 assert.equal(setStallClosed(firstStallId, true), true);
 assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).canEnter, false);
-assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).statusText, "休攤");
+assert.equal(getStallDisplayStatus(gameState.stalls[0], gameState.environment).code, STALL_DISPLAY_STATUS.CLOSED);
+assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).statusText, "今日公休");
 assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).notice, "今天休攤。");
 setStallClosed(firstStallId, false);
 setInfluencer(true, firstStallId);
 assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).isBlocked, true);
 assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).canEnter, false);
+assert.equal(getStallViewState(gameState.stalls[0], gameState.environment).label, "網紅佔領中");
 setInfluencer(false);
 
 assert.equal(setEnvironmentFlag("raining", true), true);
@@ -151,6 +163,8 @@ assert.equal(setEnvironmentFlag("mosquito", true), true);
 assert.equal(gameState.environment.raining, true);
 assert.equal(gameState.environment.mosquito, true);
 assert.equal(setEnvironmentFlag("unknown", true), false);
+assert.equal(getEnvironmentStageView(gameState.environment).code, "rain");
+assert.equal(getEnvironmentStageView(gameState.environment).mosquito, true);
 
 const resourceSnapshot = JSON.stringify({ player: gameState.player, progress: gameState.progress, life: gameState.stalls.map((item) => item.life) });
 assert.match(getStallPlaceholderCopy(gameState.stalls[0]).message, /Step 4/);
@@ -165,9 +179,11 @@ assert.equal(gameState.statistics.totalActions, 0);
 
 const nightMarketMarkup = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const nightMarketStyles = readFileSync(new URL("../style.css", import.meta.url), "utf8");
-assert.doesNotMatch(nightMarketMarkup, /id="market-title"|今晚逛哪一攤|data-stall-life-row|營業耐久/);
-assert.match(nightMarketMarkup, /下一攤去哪？/);
+assert.doesNotMatch(nightMarketMarkup, /data-stall-carousel|data-stall-direction|market-character|go-home-button|data-stall-life-row|營業耐久/);
+assert.match(nightMarketMarkup, /data-environment-stage/);
+assert.match(nightMarketMarkup, /data-stall-grid/);
 assert.match(nightMarketMarkup, /id="stall-detail-dialog"/);
-assert.match(nightMarketStyles, /aspect-ratio:\s*16\s*\/\s*9/);
+assert.match(nightMarketStyles, /\.stall-grid\s*\{[^}]*overflow-y:auto/s);
+assert.match(nightMarketStyles, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
 
 console.log("NightMarketLife core tests: PASS");

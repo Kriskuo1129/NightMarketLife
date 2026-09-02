@@ -2,7 +2,7 @@ import { getPlayerDisplayName } from "./character.js";
 import { CONFIG, getBuildById } from "./config.js";
 import { getAppearanceView } from "./character-setup.js";
 import { renderAllCharacters } from "./character-renderer.js";
-import { getStallViewState } from "./stalls.js";
+import { getStallDisplayStatus } from "./stalls.js";
 
 export const SCENES = Object.freeze({ HOME: "HOME", CHARACTER_SETUP: "CHARACTER_SETUP", NIGHT_MARKET: "NIGHT_MARKET", RESULT: "RESULT" });
 
@@ -68,20 +68,36 @@ export function setStatus(message = "") {
   if (status) status.textContent = message;
 }
 
-function renderEnvironmentStatuses(environment) {
-  const container = document.querySelector("[data-environment-statuses]");
-  if (!container) return;
-  const statuses = [];
-  if (environment.raining) statuses.push("🌧 下雨中");
-  if (environment.mosquito) statuses.push("🦟 蚊子很多");
-  if (environment.influencer) statuses.push("📱 網紅出沒中");
-  if (!statuses.length) statuses.push("今晚一切正常。");
-  container.replaceChildren(...statuses.map((text) => {
-    const status = document.createElement("span");
-    status.className = "environment-chip";
-    status.textContent = text;
-    return status;
-  }));
+export function getEnvironmentStageView(environment) {
+  const primary = environment.raining
+    ? { code: "rain", message: "突然下大雨" }
+    : environment.influencer
+      ? { code: "influencer", message: "網紅出現在夜市！" }
+      : environment.mosquito
+        ? { code: "mosquito", message: "附近的蚊子變多了..." }
+        : environment.crowdLevel >= 4
+          ? { code: "crowd", message: "今天的人潮特別多" }
+          : { code: "normal", message: "今晚的夜市十分熱鬧" };
+  return {
+    ...primary,
+    raining: Boolean(environment.raining),
+    mosquito: Boolean(environment.mosquito),
+    influencer: Boolean(environment.influencer),
+    crowded: environment.crowdLevel >= 4
+  };
+}
+
+function renderEnvironmentStage(environment) {
+  const stage = document.querySelector("[data-environment-stage]");
+  if (!stage) return;
+  const view = getEnvironmentStageView(environment);
+  stage.dataset.environmentStage = view.code;
+  stage.dataset.raining = String(view.raining);
+  stage.dataset.mosquito = String(view.mosquito);
+  stage.dataset.influencer = String(view.influencer);
+  stage.dataset.crowded = String(view.crowded);
+  const message = stage.querySelector("[data-environment-message]");
+  if (message) message.textContent = view.message;
 }
 
 function createStallCard(stall) {
@@ -89,26 +105,39 @@ function createStallCard(stall) {
   button.type = "button";
   button.className = "stall-card";
   button.dataset.stallId = stall.id;
-  button.setAttribute("role", "listitem");
-  const icon = document.createElement("span");
-  icon.className = "stall-card-icon";
-  icon.setAttribute("aria-hidden", "true");
-  const name = document.createElement("span");
+  const copy = document.createElement("span");
+  copy.className = "stall-card-copy";
+  const name = document.createElement("strong");
   name.className = "stall-card-name";
-  const meta = document.createElement("span");
-  meta.className = "stall-card-meta";
   const status = document.createElement("span");
-  status.className = "stall-card-meta";
-  status.dataset.cardStatus = "";
-  button.append(icon, name, meta, status);
+  status.className = "stall-card-status";
+  copy.append(name, status);
+  button.append(copy);
   return button;
 }
 
-function ensureStallCards(gameState, carousel) {
-  const existingIds = [...carousel.querySelectorAll("[data-stall-id]")].map((card) => card.dataset.stallId);
+function createHomeCard() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "stall-card stall-card--home";
+  button.dataset.action = "go-home";
+  button.setAttribute("aria-label", "回家，結束今晚行程");
+  const copy = document.createElement("span");
+  copy.className = "stall-card-copy";
+  const name = document.createElement("strong");
+  name.textContent = "回家";
+  const status = document.createElement("span");
+  status.textContent = "結束今晚行程";
+  copy.append(name, status);
+  button.append(copy);
+  return button;
+}
+
+function ensureStallCards(gameState, grid) {
+  const existingIds = [...grid.querySelectorAll("[data-stall-id]")].map((card) => card.dataset.stallId);
   const nextIds = gameState.stalls.map((stall) => stall.id);
   if (existingIds.join("|") !== nextIds.join("|")) {
-    carousel.replaceChildren(...gameState.stalls.map(createStallCard));
+    grid.replaceChildren(...gameState.stalls.map(createStallCard), createHomeCard());
   }
 }
 
@@ -119,41 +148,38 @@ export function getSelectedStall(gameState) {
 export function selectStall(gameState, stallId) {
   if (!gameState.stalls.some((stall) => stall.id === stallId)) return false;
   gameState.session.selectedStallId = stallId;
+  const grid = document.querySelector("[data-stall-grid]");
+  if (grid) grid.dataset.selectedStallId = stallId;
   renderNightMarket(gameState);
   return true;
 }
 
 export function scrollSelectedStallIntoView() {
-  document.querySelector('.stall-card[aria-pressed="true"]')?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  const grid = document.querySelector("[data-stall-grid]");
+  const stallId = grid?.dataset.selectedStallId;
+  if (stallId) document.querySelector(`[data-stall-id="${CSS.escape(stallId)}"]`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 export function renderNightMarket(gameState) {
-  renderEnvironmentStatuses(gameState.environment);
-  const carousel = document.querySelector("[data-stall-carousel]");
-  if (!carousel) return;
-  ensureStallCards(gameState, carousel);
-  carousel.querySelectorAll("[data-stall-id]").forEach((card) => {
+  renderEnvironmentStage(gameState.environment);
+  const grid = document.querySelector("[data-stall-grid]");
+  if (!grid) return;
+  ensureStallCards(gameState, grid);
+  grid.querySelectorAll("[data-stall-id]").forEach((card) => {
     const stall = gameState.stalls.find((item) => item.id === card.dataset.stallId);
-    const view = getStallViewState(stall, gameState.environment);
-    card.setAttribute("aria-pressed", String(stall.id === gameState.session.selectedStallId));
-    card.classList.toggle("is-closed", view.isClosed);
-    card.classList.toggle("is-blocked", view.isBlocked);
-    card.querySelector(".stall-card-icon").textContent = stall.icon;
+    const view = getStallDisplayStatus(stall, gameState.environment);
+    card.classList.toggle("stall-card--closed", view.isClosed);
+    card.classList.toggle("stall-card--blocked", view.isBlocked);
     card.querySelector(".stall-card-name").textContent = stall.name;
-    card.querySelector(".stall-card-meta").textContent = view.typeLabel;
-    card.querySelector("[data-card-status]").textContent = view.statusText;
-    card.setAttribute("aria-label", stall.name + "，" + view.typeLabel + "，" + view.statusText);
+    card.querySelector(".stall-card-status").textContent = view.label;
+    card.setAttribute("aria-label", stall.name + "，" + view.label);
   });
   const stall = getSelectedStall(gameState);
-  const view = getStallViewState(stall, gameState.environment);
+  const view = getStallDisplayStatus(stall, gameState.environment);
   if (!stall || !view) return;
   const selectedValues = {
-    sceneName: stall.name,
-    icon: stall.icon,
-    type: view.typeLabel,
     name: stall.name,
-    description: stall.description,
-    status: view.statusText,
+    status: view.label,
     reason: view.canEnter ? "" : view.notice
   };
   document.querySelectorAll("[data-selected-stall]").forEach((element) => {
