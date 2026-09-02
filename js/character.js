@@ -15,6 +15,7 @@ export function createPlayer(settings = {}) {
   };
   return {
     name: String(name).trim(),
+    profile: { avatar: settings.avatar ?? settings.profile?.avatar ?? null },
     buildId: build.id,
     stamina: build.stamina,
     maxStamina: build.stamina,

@@ -53,10 +53,21 @@ function resetNightMarketScroll() {
 export function startNightMarketFromHome(name = "") {
   const legacyAppearance = loadCharacterSettings() ?? {};
   resetGameState({ ...legacyAppearance, name, buildId: CONFIG.defaults.buildId });
+  const saved = saveCharacterSettings(gameState.player);
+  if (!saved.ok) {
+    setAvatarStatus("玩家資料無法保存，請更換較小的大頭貼後重試。");
+    render(gameState);
+    return false;
+  }
   setStatus("");
   changeScene(gameState, SCENES.NIGHT_MARKET);
   resetNightMarketScroll();
   return gameState;
+}
+
+function setAvatarStatus(message = "") {
+  const status = document.querySelector("[data-avatar-status]");
+  if (status) status.textContent = message;
 }
 
 function bindUI() {
@@ -99,11 +110,25 @@ function bindUI() {
     try {
       const file = event.target.files?.[0];
       const dataUrl = kind === "clothes" ? await processCustomClothesImage(file) : await processCustomFaceImage(file);
+      if (kind === "avatar") {
+        const previousAvatar = gameState.player.profile.avatar;
+        gameState.player.name = document.querySelector("#player-name")?.value.trim() ?? gameState.player.name;
+        gameState.player.profile.avatar = dataUrl;
+        const saved = saveCharacterSettings(gameState.player);
+        if (!saved.ok) {
+          gameState.player.profile.avatar = previousAvatar;
+          throw new Error("大頭貼資料太大，無法保存。請更換較小圖片後重試。");
+        }
+        setAvatarStatus("大頭貼已更新並保存。");
+        render(gameState);
+        return;
+      }
       setCustomAppearance(gameState.player, kind, dataUrl);
       setStatus(kind === "face" ? "自訂臉已套用。" : "自訂衣服已套用。");
       render(gameState);
     } catch (error) {
-      setStatus(error.message || "圖片處理失敗，請重試。");
+      if (kind === "avatar") setAvatarStatus(error.message || "大頭貼處理失敗，請重試。");
+      else setStatus(error.message || "圖片處理失敗，請重試。");
     } finally {
       event.target.value = "";
     }

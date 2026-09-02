@@ -558,7 +558,7 @@ Stall Grid 完全由 `gameState.stalls` 產生，目前仍是 Config 既有的 7
 
 ## 本輪明確未實作
 
-- 未實作 Avatar Upload。
+- 該輪尚未實作 Avatar Upload；後續已由「HOME UI Revision + Player Avatar」補上。
 - 未實作 Equipment System。
 - 未新增刮刮樂、道具店或夾娃娃機正式功能。
 - 未執行任何攤位 Gameplay 資源變化。
@@ -578,3 +578,46 @@ Stall Grid 完全由 `gameState.stalls` 產生，目前仍是 Config 既有的 7
 - `tests/core.test.mjs`：`NightMarketLife core tests: PASS`。
 
 本次只修改尺寸、間距與 Responsive 基準；未修改 GameState、ActivityResult、Stall、Carousel／Modal 行為、Environment、Debug、Storage、Upload、Build、Appearance、回家或 RESULT 邏輯，亦未開始 Step 4。
+
+---
+
+# HOME UI Revision + Player Avatar
+
+## 實機上方留白與 Safe Area / Viewport 修正
+
+HOME 與 NIGHT_MARKET 原本共用 `main { min-height: 100vh; display: grid; align-items: center; }`，導致 Scene 在手機可用 Viewport 內垂直置中；NIGHT_MARKET 同時使用固定外層 padding 與 `calc(100dvh - 2rem)`，在 Safari／Chrome Browser UI 與 Safe Area 情境下會疊加上方空白。現在 `main` 改為自然由上往下排列，使用 `100dvh`，頂部與底部只保留 `env(safe-area-inset-*) + 0.5rem` 的小間距；320px 時為 `safe-area + 0.35rem`。NIGHT_MARKET 高度同步扣除 Safe Area 與這 1rem 小間距，HUD 從可用畫面頂端約 5.6～9px 開始。
+
+NIGHT_MARKET 的 HUD、Animation Stage 與 Stall Grid Layout 未重新設計。Body 不負責 Gameplay 捲動；HUD 與 Stage 固定，只有 `.stall-grid` 維持 `overflow-y: auto`、`overscroll-behavior: contain` 與可用高度內的獨立捲動。
+
+## HOME 視覺統一
+
+HOME 改用與新版 NIGHT_MARKET 相同的黑褐／深咖啡 Surface、暖橘細邊框、暖黃燈光、米白文字與緊湊間距。大型紅色實心招牌改為小型夜市標題區與燈泡列；介紹文案內容未修改，只調整字級、行距與寬度。Input 改為深色 Surface，Primary 與 Secondary Button 改用同系暖色 Border／Highlight，不再使用亮紅與大塊淺黃色。共用色彩整理為 `--nml-bg`、`--nml-surface`、`--nml-surface-dark`、`--nml-border`、`--nml-gold`、`--nml-orange`、`--nml-text`、`--nml-muted`，沒有大規模重構其他 Scene。
+
+## Player Profile Avatar Model 與 Storage
+
+Player 新增獨立的 `profile.avatar`，不與 `appearance.faceId` 或 `customFace` 混用。`nightMarketLife.characterSettings.v1` 新增向後相容的 `avatar` 欄位；舊資料缺少欄位時使用 `null` 並顯示 CSS 人像剪影。Avatar 屬於玩家設定，HOME 上傳成功後立即保存，開始遊戲時與名稱再次保存；New Game 會從 Settings 保留 Avatar，但體力、金錢、分數、事件與其他本局狀態仍重新初始化。Storage Quota Failure 會保留前一張 Avatar 並在 HOME 顯示友善訊息。
+
+## Avatar Upload 與共用圖片處理
+
+HOME 的圓形 Avatar 與「更換大頭貼」共用同一個 file input，接受 PNG、JPEG、WEBP，原檔上限 5 MB。Avatar 直接重用 Legacy Custom Face 的 `processCustomFaceImage()`：格式／大小驗證、瀏覽器 Decode、1:1 Center Crop、512×512 Canvas、WEBP quality 0.82 與 PNG fallback 均只有一份底層實作。圖片資料保持正方形；HOME 與 RESULT 以 `border-radius: 50%`、`overflow: hidden`、`object-fit: cover` 的 UI Mask 顯示，不把 Data URL 實際裁成透明圓形。非圖片、超過 5 MB、Decode Failure、Canvas／Encode Failure 與 Storage Quota Failure 都透過頁面 Status 顯示，不使用 alert。
+
+Legacy CHARACTER_SETUP、`character-renderer.js`、Face／Clothes Assets、Upload UI 與 Paper Doll 流程均保留。Legacy Custom Face 與 HOME Avatar 共用處理器後仍可正常輸出 512×512；Custom Clothes 仍維持既有 25:32 處理。
+
+## 正式流程與 RESULT Avatar
+
+正式流程維持 HOME → NIGHT_MARKET，不恢復 CHARACTER_SETUP。開始時取得名稱、保留 Avatar、套用 `CONFIG.defaults.buildId` 並初始化 New Game。NIGHT_MARKET HUD 仍只顯示體力、精彩分數與金錢，沒有加入 Avatar。既有 RESULT Placeholder 只在玩家名稱附近加入圓形 Avatar，用於驗證 HOME Upload → Game → RESULT 的持續性；結算內容與規則未重新設計。
+
+## Responsive 與 Regression
+
+| Viewport | HOME top | HOME 水平 Overflow | NIGHT_MARKET HUD top | Body Gameplay Scroll | Stall Grid Scroll |
+| --- | ---: | --- | ---: | --- | --- |
+| 320×844 | 5.6px | 無 | 6.6px | 無 | 正常 |
+| 390×844 | 8px | 無 | 9px | 無 | 正常 |
+| 390×900 | 8px | 無 | 9px | 無 | 正常 |
+| 430×932 | 8px | 無 | 9px | 無 | 正常 |
+
+四個 Viewport 的 Avatar 都保持正圓；Input 高度 48px、開始按鈕約 48px，沒有溢出或縮小 Touch Area。Avatar 實際上傳測試涵蓋 JPEG、PNG、透明 PNG、WEBP、橫圖、直圖與正方形圖，全部輸出 512×512 WEBP 並以圓形 Mask 顯示。重新整理後 Avatar 與名稱可正常還原；HOME → NIGHT_MARKET → RESULT 顯示相同 Avatar。非圖片、5 MB 超限與破損 PNG 均顯示對應友善訊息。Console Error／Warning 為 0。
+
+`tests/core.test.mjs` 保留 Step 1 Core、Step 2 Legacy 與 Step 3 Core UI Revision，並新增空 Avatar fallback、Avatar Settings 保存、New Game 保留、1:1 Crop 規格、HOME → NIGHT_MARKET 與 RESULT Avatar Render 防回歸驗證，完整 PASS。專案仍不存在 `NIGHTMARKETLIFE_TECHNICAL_FUNCTIONAL_SPEC.md`，因此沒有建立或同步額外技術規格檔案。
+
+本次未開始 Step 4，未修改 Stall Gameplay、ActivityResult、Environment Gameplay、Build、裝備、刮刮樂、道具店、排行榜或 PK，也未刪除 Legacy Paper Doll。

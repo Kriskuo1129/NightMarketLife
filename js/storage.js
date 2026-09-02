@@ -3,6 +3,7 @@ const CHARACTER_SETTINGS_KEY = "nightMarketLife.characterSettings.v1";
 export function saveCharacterSettings(settings) {
   const allowed = {
     name: settings.name ?? "",
+    avatar: settings.avatar ?? settings.profile?.avatar ?? null,
     buildId: settings.buildId ?? "",
     selectedFaceId: settings.selectedFaceId ?? settings.appearance?.faceId ?? settings.face ?? "",
     selectedClothesId: settings.selectedClothesId ?? settings.appearance?.clothesId ?? settings.clothes ?? "",

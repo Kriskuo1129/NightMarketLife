@@ -21,7 +21,7 @@ const { createAchievement, ACHIEVEMENT_RARITIES } = await import("../js/achievem
 const { gameState } = await import("../js/state.js");
 const { createNewGame, applyActivityResult, completeCharacterSetup, getStallPlaceholderCopy, selectStallAndScroll, setEnvironmentFlag, setInfluencer, setStallClosed, startNightMarketFromHome } = await import("../js/game.js");
 const { getEnvironmentStageView } = await import("../js/ui.js");
-const { applyBuildToPlayer, getPlayerDisplayName } = await import("../js/character.js");
+const { applyBuildToPlayer, createPlayer, getPlayerDisplayName } = await import("../js/character.js");
 const { cycleAsset, changeClothes, changeFace, setCustomAppearance } = await import("../js/character-setup.js");
 const { FACE_ASSETS, DEFAULT_CLOTHES, SHOP_CLOTHES } = await import("../assets/character-assets.js");
 const { validateImageFile, calculateCenterCrop, MAX_UPLOAD_BYTES, CLOTHES_OUTPUT_WIDTH, CLOTHES_OUTPUT_HEIGHT, FACE_OUTPUT_SIZE } = await import("../js/uploads.js");
@@ -36,8 +36,9 @@ assert.deepEqual(CONFIG.characterBuilds.map(({ name, stamina, money }) => ({ nam
   { name: "老年人", stamina: 70, money: 1600 }
 ]);
 
-createNewGame({ name: "測試者", buildId: "high-school" });
+createNewGame({ name: "測試者", avatar: "data:image/webp;base64,avatar", buildId: "high-school" });
 assert.equal(gameState.session.scene, "NIGHT_MARKET");
+assert.equal(gameState.player.profile.avatar, "data:image/webp;base64,avatar");
 assert.equal(gameState.player.maxStamina, 120);
 assert.equal(gameState.environment.crowdLevel, 3);
 assert.ok(gameState.progress.nextEventAt >= 4 && gameState.progress.nextEventAt <= 6);
@@ -71,6 +72,7 @@ assert.equal(validateImageFile({ type: "image/png", size: MAX_UPLOAD_BYTES + 1 }
 assert.equal(validateImageFile({ type: "image/webp", size: 1024 }).ok, true);
 assert.equal(CLOTHES_OUTPUT_WIDTH / CLOTHES_OUTPUT_HEIGHT, 25 / 32);
 assert.equal(FACE_OUTPUT_SIZE, 512);
+assert.equal(createPlayer().profile.avatar, null);
 assert.deepEqual(calculateCenterCrop(1000, 1000), { x: 109.375, y: 0, width: 781.25, height: 1000 });
 assert.deepEqual(calculateCenterCrop(1600, 900), { x: 448.4375, y: 0, width: 703.125, height: 900 });
 assert.deepEqual(calculateCenterCrop(900, 1600), { x: 0, y: 224, width: 900, height: 1152 });
@@ -79,11 +81,17 @@ assert.deepEqual(calculateCenterCrop(1200, 600, FACE_OUTPUT_SIZE, FACE_OUTPUT_SI
 assert.deepEqual(calculateCenterCrop(600, 1200, FACE_OUTPUT_SIZE, FACE_OUTPUT_SIZE), { x: 0, y: 300, width: 600, height: 600 });
 assert.throws(() => calculateCenterCrop(0, 640), /正數/);
 
+const originalSetItem = localStorage.setItem;
+localStorage.setItem = () => { throw new Error("quota"); };
+assert.equal(saveCharacterSettings(gameState.player).ok, false);
+localStorage.setItem = originalSetItem;
+
 saveCharacterSettings(gameState.player);
 const storedCharacter = loadCharacterSettings();
 assert.equal(storedCharacter.buildId, "senior");
 assert.equal(storedCharacter.selectedFaceId, FACE_ASSETS[1].id);
 assert.equal(storedCharacter.customClothes, "data:image/webp;base64,clothes");
+assert.equal(storedCharacter.avatar, "data:image/webp;base64,avatar");
 applyBuildToPlayer(gameState.player, "high-school");
 
 applyActivityResult({ staminaDelta: -25, moneyDelta: 50, scoreDelta: 10, progressCost: 2, sourceId: "test-work" });
@@ -112,6 +120,7 @@ assert.equal(gameState.player.buildId, "worker");
 startNightMarketFromHome("首頁玩家");
 assert.equal(gameState.session.scene, "NIGHT_MARKET");
 assert.equal(gameState.player.name, "首頁玩家");
+assert.equal(gameState.player.profile.avatar, "data:image/webp;base64,avatar");
 assert.equal(gameState.player.buildId, CONFIG.defaults.buildId);
 assert.equal(gameState.player.money, 1000);
 
@@ -183,7 +192,10 @@ assert.doesNotMatch(nightMarketMarkup, /data-stall-carousel|data-stall-direction
 assert.match(nightMarketMarkup, /data-environment-stage/);
 assert.match(nightMarketMarkup, /data-stall-grid/);
 assert.match(nightMarketMarkup, /id="stall-detail-dialog"/);
+assert.match(nightMarketMarkup, /data-upload="avatar"/);
+assert.match(nightMarketMarkup, /result-identity[\s\S]*data-avatar-image/);
 assert.match(nightMarketStyles, /\.stall-grid\s*\{[^}]*overflow-y:auto/s);
 assert.match(nightMarketStyles, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+assert.match(nightMarketStyles, /\.avatar-frame\s*\{[^}]*border-radius:50%/s);
 
 console.log("NightMarketLife core tests: PASS");

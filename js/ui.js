@@ -19,6 +19,15 @@ export function render(gameState) {
   document.querySelectorAll("[data-player]").forEach((element) => {
     element.textContent = values[element.dataset.player] ?? "";
   });
+  const avatar = gameState.player.profile?.avatar || "";
+  document.querySelectorAll("[data-avatar-image]").forEach((image) => {
+    if (avatar) image.src = avatar;
+    else image.removeAttribute("src");
+    image.hidden = !avatar;
+  });
+  document.querySelectorAll("[data-avatar-fallback]").forEach((fallback) => {
+    fallback.hidden = Boolean(avatar);
+  });
   renderAllCharacters(gameState.player);
   const appearance = getAppearanceView(gameState.player);
   document.querySelectorAll("[data-preview]").forEach((image) => {

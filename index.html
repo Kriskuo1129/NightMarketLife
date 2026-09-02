@@ -12,14 +12,28 @@
   <main id="app">
     <section class="scene home-scene" data-scene="HOME" aria-labelledby="home-title">
       <div class="signboard">
+        <div class="title-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
         <p class="eyebrow">Night Market Life</p>
         <h1 id="home-title">夜市人生</h1>
         <p class="tagline">你今晚想過得多精彩？</p>
       </div>
       <p class="intro">勇闖每晚都不一樣的夜市，玩遍奇奇怪怪的攤位、應付意想不到的大小事，拚盡全力把分數衝高，創造屬於你的精彩一夜！</p>
       <form id="home-form" class="home-form">
-        <label for="player-name">玩家名稱</label>
-        <input id="player-name" name="playerName" type="text" maxlength="24" autocomplete="nickname" placeholder="可以留空">
+        <div class="home-profile">
+          <label class="avatar-upload" aria-label="更換玩家大頭貼">
+            <span class="avatar-frame">
+              <img data-avatar-image alt="玩家大頭貼" hidden>
+              <span class="avatar-fallback" data-avatar-fallback aria-hidden="true">●</span>
+            </span>
+            <span class="avatar-action">更換大頭貼</span>
+            <input data-upload="avatar" type="file" accept="image/png,image/jpeg,image/webp">
+          </label>
+          <div class="name-field">
+            <label for="player-name">玩家名稱</label>
+            <input id="player-name" name="playerName" type="text" maxlength="24" autocomplete="nickname" placeholder="可以留空">
+          </div>
+        </div>
+        <p class="avatar-status" data-avatar-status role="status" aria-live="polite"></p>
         <button class="primary-button" type="submit">開始遊戲</button>
       </form>
       <div class="secondary-actions" aria-label="其他模式">
@@ -73,7 +87,13 @@
     <section class="scene result-scene" data-scene="RESULT" aria-labelledby="result-title" hidden>
       <p class="eyebrow">Tonight's Result</p>
       <h2 id="result-title">結算功能將於後續 Step 實作</h2>
-      <p class="result-player"><strong data-player="name"></strong>，今晚先逛到這裡。</p>
+      <div class="result-identity">
+        <span class="avatar-frame avatar-frame--result">
+          <img data-avatar-image alt="玩家大頭貼" hidden>
+          <span class="avatar-fallback" data-avatar-fallback aria-hidden="true">●</span>
+        </span>
+        <p class="result-player"><strong data-player="name"></strong>，今晚先逛到這裡。</p>
+      </div>
       <dl class="result-stats"><div><dt>⭐ 精彩分數</dt><dd data-player="score"></dd></div><div><dt>💰 金錢</dt><dd data-player="money"></dd></div><div><dt>❤️ 體力</dt><dd data-player="stamina"></dd></div></dl>
       <button class="primary-button" type="button" data-scene-target="HOME">回首頁</button>
     </section>
