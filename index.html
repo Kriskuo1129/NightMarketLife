@@ -101,7 +101,7 @@
 
   <dialog id="build-dialog" aria-labelledby="build-dialog-title"><div class="dialog-card"><div class="dialog-heading"><h2 id="build-dialog-title">選擇角色 Build</h2><button type="button" data-close-dialog aria-label="關閉">×</button></div><div class="build-options" data-build-options></div></div></dialog>
   <dialog id="pro-dialog" aria-labelledby="pro-dialog-title"><div class="dialog-card compact-dialog"><p class="pro-badge">PRO</p><h2 id="pro-dialog-title">僅限 PRO 會員使用</h2><p>這只是夜市老闆開的玩笑，目前沒有真正的會員系統。</p><button class="primary-button" type="button" data-close-dialog>知道了</button></div></dialog>
-  <dialog id="stall-detail-dialog" class="stall-detail-dialog" aria-labelledby="stall-detail-title"><div class="dialog-card"><p class="eyebrow">攤位入口</p><h2 id="stall-detail-title" data-selected-stall="name"></h2><p class="stall-status"><span>目前狀態：</span><strong data-selected-stall="status"></strong></p><p class="stall-block-reason" data-selected-stall="reason" hidden></p><div class="stall-modal-actions"><button type="button" data-close-dialog>取消</button><button class="primary-button" type="button" data-action="enter-stall">前往攤位</button></div></div></dialog>
+  <dialog id="stall-detail-dialog" class="stall-detail-dialog" aria-labelledby="stall-detail-title"><div class="dialog-card"><p class="eyebrow">攤位入口</p><h2 id="stall-detail-title" data-selected-stall="name"></h2><p class="stall-status"><span>目前狀態：</span><strong data-selected-stall="status"></strong></p><p class="stall-block-reason" data-selected-stall="reason" hidden></p><div class="stall-modal-actions"><button class="modal-secondary-button" type="button" data-close-dialog>取消</button><button class="primary-button" type="button" data-action="enter-stall">前往攤位</button></div></div></dialog>
   <dialog id="stall-dialog" aria-labelledby="stall-dialog-title"><div class="dialog-card compact-dialog"><p class="pro-badge">準備中</p><h2 id="stall-dialog-title" data-stall-dialog-title>老闆還在準備中！</h2><p data-stall-dialog-message>攤位功能將於 Step 4 實作。</p><button class="primary-button" type="button" data-close-dialog>繼續逛</button></div></dialog>
   <dialog id="home-dialog" aria-labelledby="home-dialog-title">
     <div class="dialog-card compact-dialog">
@@ -109,7 +109,7 @@
       <h2 id="home-dialog-title">今晚就先回家嗎？</h2>
       <p>正式結算還在準備中，現在回家會先前往結果 Placeholder。</p>
       <div class="confirmation-actions">
-        <button type="button" data-close-dialog>繼續逛</button>
+        <button class="modal-secondary-button" type="button" data-close-dialog>繼續逛</button>
         <button class="primary-button" type="button" data-action="confirm-home">回家</button>
       </div>
     </div>

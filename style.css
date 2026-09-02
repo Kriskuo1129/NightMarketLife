@@ -100,12 +100,16 @@ dialog { width:min(calc(100% - 2rem),27rem); max-height:calc(100vh - 2rem); padd
 .stall-block-reason { color:#e7c18d; font-size:.85rem; }
 .stall-modal-actions { display:grid; grid-template-columns:1fr 1fr; gap:.55rem; margin-top:1rem; }
 .stall-modal-actions>button { min-height:44px; }
+.modal-secondary-button { border:1px solid #684631; border-radius:.7rem; color:var(--nml-text); background:#211613; font-weight:800; transition:border-color .15s ease,background-color .15s ease,transform .15s ease; }
+.modal-secondary-button:hover { border-color:#9a6845; background:#2d1d18; }
+.modal-secondary-button:active { border-color:#b97a4c; background:#18100e; transform:translateY(.1rem); }
+.modal-secondary-button:focus-visible { outline:2px solid var(--nml-gold); outline-offset:2px; }
 .result-scene { text-align:center; }
 .result-identity { display:grid; justify-items:center; gap:.45rem; margin:1rem 0; }
 .avatar-frame--result { width:5rem; }
 .result-player { color:#e6cba7; }
 .confirmation-actions { display:grid; grid-template-columns:1fr 1fr; gap:.65rem; margin-top:1rem; }
-.confirmation-actions>button { border:0; border-radius:.7rem; color:#fff4dc; background:#5c4032; font-weight:800; }
+.confirmation-actions>button { border-radius:.7rem; font-weight:800; }
 @keyframes market-rain { to { transform:translate(1.25rem,14rem) rotate(18deg); } }
 @keyframes market-buzz { 50% { transform:translate(1rem,-.8rem); } }
 @media (max-width:350px) { .market-hud { padding-inline:.35rem; } .hud-stats dt { font-size:.61rem; } .hud-stats dd { font-size:.8rem; } .stall-grid { gap:.5rem; padding-inline:.5rem; grid-auto-rows:7.75rem; } .section-heading { padding-inline:.55rem; } .stall-card-copy { inset:auto .5rem .5rem; } }
