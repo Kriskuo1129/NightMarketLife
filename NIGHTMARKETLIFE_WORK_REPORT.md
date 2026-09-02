@@ -471,3 +471,44 @@ Modal 顯示 Icon、名稱、類型、簡短描述、營業狀態、進入與取
 瀏覽器另確認：最上方直接為 HUD、舊標題不存在、Card 明顯變扁、固定 Detail 不存在、點 Card 開啟 Modal、Modal 不顯示 Life、正常攤位沒有可進入提示、箭頭不自動開 Modal、Enter Placeholder 不改資源、回家與 RESULT／HOME 流程正常。Console Error／Warning 為 0。核心測試新增 UI 結構防回歸檢查並完整 PASS。
 
 本次只進行 Step 3 UI 收斂；未開始 Step 4，未改變資源消耗、Action、Stall Life、事件、成就或正式結算邏輯。
+
+---
+
+# 390 × 900 UI 基準調整
+
+## 61. 設計基準
+
+NIGHT_MARKET 與 CHARACTER_SETUP 的主要手機設計基準由 390×844 調整為 390×900。此尺寸只作為 UI 配置與驗收基準，沒有將網站寫死為固定寬高；主容器仍使用響應式寬度與 Viewport 高度，320px、390px、430px 均可正常使用。
+
+## 62. NIGHT_MARKET 尺寸調整
+
+390×900 與其他高度至少 880px 的畫面會適度增加 HUD 欄位、Environment Status、Carousel、Stall Card 與回家按鈕的上下 padding，並讓 NIGHT_MARKET 使用最高 608px 的主畫面容器，以 `justify-content: space-between` 將額外高度分配為區塊呼吸空間。Carousel 仍保持扁平卡片，Stall Detail 仍使用 Modal，Life UI 仍隱藏；較矮畫面沿用緊湊配置，不使用 `transform: scale()` 或 `zoom`。
+
+## 63. CHARACTER_SETUP 尺寸調整
+
+390×900 下 Character Setup 的所有主要內容可完整顯示。320px 不再將 Face／Clothes Picker 強制改成單欄，而是保留可操作的雙欄排列、縮小欄間距與 fieldset padding，避免額外增加垂直高度。390×844 允許 56px 的少量捲動，不為了較矮螢幕犧牲 390×900 的主要視覺比例；Touch Target 與文字尺寸維持合理大小。
+
+## 64. Character Renderer 與 16:9 Scene
+
+Character Setup 與 Night Market 仍共用 `character-renderer.js` 及同一套 Face／Body／Accessory Layer。此次沒有修改 Face／Body 比例、top、Mask、Border Radius 或 z-index，也沒有再縮小夜市角色。Night Market Scene 的實測比例在所有尺寸均為 16:9。
+
+## 65. Responsive 實測
+
+| Viewport | Character Setup scrollHeight | Night Market scrollHeight | Night Market Scene | 水平 Overflow |
+| --- | ---: | ---: | --- | --- |
+| 320×844 | 844 | 844 | 16:9 | 無 |
+| 390×844 | 900 | 844 | 16:9 | 無 |
+| 390×900 | 900 | 900 | 16:9 | 無 |
+| 430×932 | 932 | 932 | 16:9 | 無 |
+
+390×900 的 Character Setup Scene 實際高度為 868.11px，Night Market Scene 容器為 608px；兩者主要操作均完整位於單一 Viewport。390×844 的 Character Setup 僅需約 56px 的少量垂直 Scroll，Night Market 不需額外 Scroll。
+
+## 66. 驗證結果
+
+- NIGHT_MARKET 最上方直接顯示 HUD，Environment、16:9 Scene、角色、Carousel、回家與 Stall Modal 均正常。
+- CHARACTER_SETUP 的名稱、Preview、Face／Clothes Picker、Upload、Build 與完成按鈕均正常顯示及操作。
+- 四種指定 Viewport 均無 body 水平 Overflow。
+- 瀏覽器 Console Error／Warning：0。
+- `tests/core.test.mjs`：`NightMarketLife core tests: PASS`。
+
+本次只修改尺寸、間距與 Responsive 基準；未修改 GameState、ActivityResult、Stall、Carousel／Modal 行為、Environment、Debug、Storage、Upload、Build、Appearance、回家或 RESULT 邏輯，亦未開始 Step 4。

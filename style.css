@@ -32,7 +32,7 @@ dialog { width:min(calc(100% - 2rem),27rem); max-height:calc(100vh - 2rem); padd
 .dialog-card { padding:1rem; } .dialog-heading { display:flex; align-items:center; justify-content:space-between; gap:.7rem; } .dialog-heading button { width:44px; border:0; border-radius:50%; color:white; background:#50372c; font-size:1.5rem; }
 .build-options { display:grid; gap:.6rem; margin-top:1rem; max-height:65vh; overflow-y:auto; } .build-option { min-height:44px; padding:.75rem; border:1px solid #754c37; border-radius:.75rem; color:#fff5e4; background:#3b2720; text-align:left; } .build-option strong,.build-option span,.build-option small { display:block; } .build-option span { margin:.25rem 0; color:var(--gold); } .build-option small { color:#d8c0a4; } .build-option[aria-pressed="true"] { border-color:var(--gold); background:#593226; }
 .compact-dialog { text-align:center; } .pro-badge { display:inline-block; margin:0; padding:.2rem .55rem; border-radius:999px; color:var(--ink); background:var(--gold); font-weight:900; }
-@media (max-width:350px) { main { padding:.5rem; } .scene { padding:.9rem; border-radius:.9rem; } .appearance-controls { grid-template-columns:1fr; } .character-preview { width:14rem; } .secondary-actions { grid-template-columns:1fr; } }
+@media (max-width:350px) { main { padding:.5rem; } .scene { padding:.9rem; border-radius:.9rem; } .character-preview { width:14rem; } .appearance-controls { gap:.45rem; } fieldset { padding:.55rem; } .secondary-actions { grid-template-columns:1fr; } }
 @media (min-width:700px) { main { width:min(100%,42rem); } .setup-scene { display:grid; grid-template-columns:1fr 1fr; gap:0 1.2rem; } .setup-scene[hidden] { display:none; } .scene-header,.player-greeting,.appearance-controls,.build-summary,.status-message,.setup-scene>.primary-button { grid-column:1/-1; } }
 
 /* Step 3 Night Market */
@@ -76,3 +76,14 @@ dialog { width:min(calc(100% - 2rem),27rem); max-height:calc(100vh - 2rem); padd
 @keyframes market-idle { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-3px); } }
 @media (prefers-reduced-motion:reduce) { .market-character { animation:none; } .stall-card { scroll-behavior:auto; transition:none; } }
 @media (max-width:350px) { .market-hud { padding:.45rem .5rem; } .stall-browser { padding:.5rem; } .hud-stats dt { font-size:.6rem; } .hud-stats dd { font-size:.78rem; } .environment-panel>strong { display:none; } .market-character { width:5.4rem; } .stall-card { flex-basis:8.6rem; } .go-home-button { width:calc(100% - 1rem); margin:0 .5rem .5rem; } }
+@media (min-height:880px) and (min-width:351px) {
+  .market-scene { min-height:min(38rem,calc(100dvh - 2rem)); display:flex; flex-direction:column; justify-content:space-between; }
+  .market-hud { padding:.75rem .85rem; }
+  .hud-stats { gap:.45rem; margin-bottom:.55rem; }
+  .hud-stats div { padding:.45rem .3rem; }
+  .environment-panel { min-height:2.05rem; padding:.35rem .55rem; }
+  .stall-browser { padding:.75rem .85rem .55rem; }
+  .stall-carousel { padding-top:.45rem; padding-bottom:.55rem; }
+  .stall-card { min-height:4.75rem; padding:.5rem .55rem; }
+  .go-home-button { width:calc(100% - 1.7rem); margin:.15rem .85rem .8rem; padding:.65rem; }
+}
