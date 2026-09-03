@@ -1,0 +1,82 @@
+import assert from 'node:assert/strict';
+import { CONFIG } from '../js/config.js';
+import { createPlayer } from '../js/character.js';
+import { gameState, createGameState } from '../js/state.js';
+import { OPENING_CONFIG, pickOpeningCondition, applyOpeningCondition } from '../js/openings.js';
+import { createEnvironment, getEligibleEnvironmentEvents, getEffectiveFoodPrice } from '../js/events.js';
+import { getStallActivity, isInteractionLocked } from '../js/gameplay.js';
+import { render, changeScene } from '../js/ui.js';
+import { loadCharacterSettings } from '../js/storage.js';
+import { createNewGame, startNightMarketFromHome, selectHomeBuild, acknowledgeOpening, applyActivityResult, playTestGame, buyFood, openManagementOffice, askManagementOffice, selectStallAndScroll, triggerEnvironmentEvent, requestEndGame, clearActivityResultPresentation } from '../js/game.js';
+
+assert.deepEqual(CONFIG.characterBuilds.map(b => [b.stamina,b.money]), [[120,600],[110,800],[100,1000],[85,1300],[70,1600]]);
+for (const buildId of [undefined, 'missing', null]) assert.equal(createPlayer({buildId}).buildId, CONFIG.defaults.buildId);
+assert.equal(OPENING_CONFIG.length,6);
+assert.equal(new Set(OPENING_CONFIG.map(o=>o.id)).size,6);
+assert.equal(OPENING_CONFIG.reduce((sum,o)=>sum+o.weight,0),100);
+const levels = [[3,1,1],[1,2,2],[4,2,2],[5,3,2],[4,0,2],[4,2,1]];
+let boundary=0;
+for (const [i,o] of OPENING_CONFIG.entries()) {
+  assert.equal(pickOpeningCondition(()=>boundary/100).id,o.id);
+  assert.equal(pickOpeningCondition(()=>(boundary+o.weight-.001)/100).id,o.id);
+  const state=createGameState(); const before=JSON.stringify({...state,environment:null});
+  const next=state.progress.nextEventAt;
+  applyOpeningCondition(state.environment,o);
+  assert.deepEqual([state.environment.crowdLevel,state.environment.priceLevel,state.environment.rewardLevel],levels[i]);
+  assert.equal(JSON.stringify({...state,environment:null}),before);
+  assert.equal(state.progress.nextEventAt,next);
+  assert.deepEqual([state.environment.raining,state.environment.mosquito,state.environment.influencer,state.environment.influencerBlockedStallId],[false,false,false,null]);
+  for (const build of CONFIG.characterBuilds) {
+    let calls=0; createNewGame({buildId:build.id},()=>{calls++;return (boundary+.1)/100;});
+    assert.equal(calls,1); assert.equal(gameState.session.openingConditionId,o.id);
+    assert.deepEqual([gameState.player.stamina,gameState.player.maxStamina,gameState.player.money,gameState.player.score],[build.stamina,build.stamina,build.money,0]);
+    assert.equal(gameState.progress.actionCount,0); assert.equal(gameState.statistics.totalActions,0);
+    assert.ok(gameState.achievements.every(a=>!a.unlocked)); assert.deepEqual(gameState.statistics.eventHistory,[]);
+    assert.ok(gameState.progress.nextEventAt>=4 && gameState.progress.nextEventAt<=6);
+    const snap=JSON.stringify(gameState); render(gameState); render(gameState); assert.equal(JSON.stringify(gameState),snap);
+  }
+  boundary+=o.weight;
+}
+assert.equal(pickOpeningCondition(()=>1).id,'BUSY_MARKET');
+for (const [delta,expected] of [[100,[5,3,4]],[-100,[1,0,0]]]) {
+  const env=createEnvironment(); applyOpeningCondition(env,{modifiers:{crowdLevel:delta,priceLevel:delta,rewardLevel:delta}});
+  assert.deepEqual([env.crowdLevel,env.priceLevel,env.rewardLevel],expected);
+}
+createNewGame({},()=>.65);
+assert.equal(gameState.session.openingConditionId,'NEW_YEAR');
+const snapshot=JSON.stringify(gameState);
+for (const action of [()=>applyActivityResult({moneyDelta:1}),()=>playTestGame('game_01'),()=>buyFood('food_01'),()=>openManagementOffice(),()=>askManagementOffice(),()=>selectStallAndScroll('food_01'),()=>triggerEnvironmentEvent(),()=>requestEndGame('HOME')]) assert.equal(action(),false);
+assert.equal(JSON.stringify(gameState),snapshot);
+assert.equal(acknowledgeOpening('stale'),false);
+assert.ok(isInteractionLocked(gameState));
+assert.equal(acknowledgeOpening(),true); assert.equal(isInteractionLocked(gameState),false);
+assert.equal(acknowledgeOpening(),false);
+assert.equal(gameState.session.presentation,null); assert.deepEqual(gameState.session.presentationQueue,[]);
+assert.deepEqual(gameState.statistics.eventHistory,[]);
+assert.equal(getEligibleEnvironmentEvents(gameState.environment).includes('CROWD_UP'),false);
+assert.equal(getEligibleEnvironmentEvents(gameState.environment).includes('PRICE_UP'),false);
+assert.equal(getEffectiveFoodPrice(gameState.stalls.find(s=>s.id==='food_01'),gameState.environment),140);
+assert.equal(getStallActivity(gameState.stalls.find(s=>s.id==='game_01'),gameState.environment).scoreDelta,24);
+changeScene(gameState,'HOME'); assert.equal(gameState.session.openingConditionId,null); assert.equal(gameState.session.openingPending,false);
+const initialProgress=JSON.stringify([gameState.progress,gameState.statistics,gameState.achievements,gameState.environment]);
+const initialResources=[gameState.player.stamina,gameState.player.money,gameState.player.score];
+assert.equal(selectHomeBuild('college'),true);
+assert.equal(loadCharacterSettings().buildId,'college');
+assert.deepEqual([gameState.player.stamina,gameState.player.money,gameState.player.score],initialResources);
+assert.equal(JSON.stringify([gameState.progress,gameState.statistics,gameState.achievements,gameState.environment]),initialProgress);
+gameState.player.stamina=1; gameState.player.money=2; gameState.player.score=900;
+startNightMarketFromHome('大學同學',()=>.75);
+assert.equal(gameState.session.openingConditionId,'ANNIVERSARY');
+assert.deepEqual([gameState.player.stamina,gameState.player.maxStamina,gameState.player.money,gameState.player.score],[110,110,800,0]);
+const setting=loadCharacterSettings();
+for(const key of ['stamina','money','score','openingConditionId','openingPending']) assert.equal(Object.hasOwn(setting,key),false);
+assert.equal(selectHomeBuild('senior'),false);
+acknowledgeOpening(); changeScene(gameState,'HOME'); selectHomeBuild('missing');
+assert.equal(gameState.player.buildId,'worker');
+assert.equal(loadCharacterSettings().buildId,'worker');
+const storageSnapshot=JSON.stringify([...localStorage.values]);
+createNewGame({},()=>0); assert.equal(gameState.session.openingConditionId,'NORMAL_NIGHT');
+createNewGame({},()=>.99); assert.equal(gameState.session.openingConditionId,'BUSY_MARKET');
+assert.equal(JSON.stringify([...localStorage.values]),storageSnapshot);
+acknowledgeOpening(); clearActivityResultPresentation(); changeScene(gameState,'HOME');
+console.log('Step 7 build/opening tests: PASS');

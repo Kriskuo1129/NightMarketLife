@@ -5,8 +5,7 @@ export const EMPTY_PLAYER_NAME = "-沒輸入名稱-";
 
 export function createPlayer(settings = {}) {
   const { name = "", buildId = CONFIG.defaults.buildId } = settings;
-  const build = getBuildById(buildId);
-  if (!build) throw new Error(`Unknown character build: ${buildId}`);
+  const build = getBuildById(buildId) ?? getBuildById(CONFIG.defaults.buildId);
   const appearance = {
     faceId: settings.selectedFaceId ?? settings.appearance?.faceId ?? settings.face ?? FACE_ASSETS[0]?.id ?? "",
     clothesId: settings.selectedClothesId ?? settings.appearance?.clothesId ?? settings.clothes ?? DEFAULT_CLOTHES[0]?.id ?? "",

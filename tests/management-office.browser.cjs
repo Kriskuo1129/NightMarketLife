@@ -12,7 +12,9 @@ const os = require('node:os');
     page.on('pageerror', error => issues.push(error.message));
     page.on('console', message => { if (['error', 'warning'].includes(message.type())) issues.push(message.text()); });
     await page.goto(process.env.NML_TEST_URL || 'http://127.0.0.1:4173/');
+    await require('./gameplay-fixture.browser.cjs')(page);
     await page.getByRole('button', { name: '開始遊戲', exact: true }).click();
+    await page.locator('[data-action="acknowledge-opening"]').click();
     const office = page.locator('#management-office-dialog');
     const card = page.locator('[data-stall-id="management"]');
     const snapshot = () => page.evaluate(() => JSON.stringify({ state: window.NMLDebug.getState(), storage: { ...localStorage } }));
@@ -29,7 +31,7 @@ const os = require('node:os');
 
     const cases = [
       ['normal', {}, /普通|正常|老樣子|沒下雨|沒什麼特別/],
-      ['rain', { raining: true }, /雨/],
+      ['rain', { raining: true }, /雨|濕答答/],
       ['mosquito', { mosquito: true }, /蚊子/],
       ['influencer', { influencer: true, influencerBlockedStallId: 'food_01' }, /測試小吃攤 A/],
       ['crowd', { crowdLevel: 5 }, /人|擠/],
@@ -93,7 +95,7 @@ const os = require('node:os');
     await page.locator('#environment-event-dialog button').click();
     await card.click();
     await office.getByRole('button', { name: '阿伯，今天夜市怎樣？', exact: true }).click();
-    assert.match(await office.locator('[data-management-dialogue]').innerText(), /雨/);
+    assert.match(await office.locator('[data-management-dialogue]').innerText(), /雨|濕答答/);
     await page.keyboard.press('Escape');
     assert.equal(await office.isVisible(), false);
     await page.getByRole('button', { name: '回家，結束今晚行程', exact: true }).click();

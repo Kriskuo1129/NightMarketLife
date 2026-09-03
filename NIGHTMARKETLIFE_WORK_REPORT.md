@@ -1035,3 +1035,81 @@ RESULT 正式成為「今晚的夜市回顧」：保留圓形 Avatar 與名稱�
 - 重跑 `tests/management-office.browser.cjs` **PASS**：七種環境口語提示、反覆詢問零副作用、Pending Lock、Commit 後資訊、HOME Cleanup、四尺寸，Console Error／Warning 0。
 
 本輪沒有實作下一階段、Build Selection、Opening Event、新攤位、服飾 Gameplay、Equipment、永久成就收藏、百科／完成率、後端／Login、Leaderboard、正式外部遊戲或 Luck。Gameplay 規則／Balance／Environment Flow 與 Legacy Paper Doll 均保留。完成後檢查 git status／git diff／git diff --stat；不 Commit、不 Push，交由使用者確認。
+
+## Step 7：Home Build Selection + Opening Mechanism
+
+### HOME Build UI / 五種身分
+
+HOME 名稱欄下方、開始遊戲上方加入「今晚的身分」區域，顯示身分名稱、初始體力、初始金錢與自然描述。專用 `home-build-dialog` 由 `CONFIG.characterBuilds` 動態產生五個選項；不在 HTML 寫死選項、不使用舊 CHARACTER_SETUP Modal。重用選項 DOM 產生函數與 CSS，但 HOME 使用自己的 container／dataset／handler，沒有依賴 Legacy DOM。正式 UI 不顯示 Build 一詞。
+
+| 身分 | stamina / maxStamina | money |
+| --- | --- | --- |
+| 高中生 | 120 / 120 | 600 |
+| 大學生 | 110 / 110 | 800 |
+| 社會人 | 100 / 100 | 1000 |
+| 中年人 | 85 / 85 | 1300 |
+| 老年人 | 70 / 70 | 1600 |
+
+數值與 ID 不變，description 使用需求建議的五句口語文案。不新增技能、Buff／Debuff、身分成就或特殊機率。`selectHomeBuild()` 僅在 HOME 更新／保存選擇及目前名稱，關閉 Picker；不套用資源、不重建 Progress／Stalls／Statistics／Achievement／Environment，也不開始遊戲。保存失敗會提示，保持原選擇。
+
+### Build Storage / Default / New Game Reset
+
+沿用 `nightMarketLife.characterSettings.v1` 的 buildId，沒有升版本或 Migration。選擇立即保存，回首頁與 Refresh 後繼續顯示。缺少或無效／已移除的 buildId 經 `createPlayer()` fallback 到 `CONFIG.defaults.buildId`（社會人），不 Crash；正常開始遊戲時會保存正規化設定。
+
+`startNightMarketFromHome()` 不再硬設 worker，而使用目前選定身分；New Game 一律由 Config 重建 stamina／maxStamina／money 並將 score 歸零。Storage 的既有允許欄位不變，不保存上一局剩餘資源。Avatar／Name／Legacy Appearance 仍保留。
+
+### Opening Config / Weight / Weighted Random
+
+新增獨立 `js/openings.js`，集中六個 `OPENING_CONFIG`（id、title、description、weight、modifiers、effectLines）、`pickOpeningCondition(randomFn)`、`getOpeningById()`、`applyOpeningCondition()`。
+
+| ID | 顯示名稱 | Weight | 初始 Crowd / Price / Reward |
+| --- | --- | --- | --- |
+| NORMAL_NIGHT | 🌤️ 普普通通的一晚 | 35 | 3 / 1 / 1 |
+| AFTER_TYPHOON | 🌪️ 颱風剛過 | 10 | 1 / 2 / 2 |
+| CONCERT_NIGHT | 🎤 今天附近有演唱會 | 15 | 4 / 2 / 2 |
+| NEW_YEAR | 🧧 過年期間 | 10 | 5 / 3 / 2 |
+| ANNIVERSARY | 🎆 夜市週年慶 | 15 | 4 / 0 / 2 |
+| BUSY_MARKET | 💸 老闆們發現今天人很多 | 15 | 4 / 2 / 1 |
+
+權重總和 100，依累積權重選取而非六種等機率。randomFn 可注入，只抽一次；每個 Build 在相同 randomFn 下得到相同 Opening，沒有 Build × Opening 對照表。六種文案與效果敘述沿用需求，自然描述環境、不新增 Crowd 體力成本或特殊倍率。
+
+### Initial Environment Apply / Session / Storage
+
+每次正式 HOME 開始或 `createNewGame()`：先透過既有 `resetGameState()`／`createEnvironment()` 建立完整 Default State，再抽 Opening，僅在這份新 Environment 上套 Modifier。Crowd Clamp 1～5、Price 0～3、Reward 0～4（倍率陣列正式範圍）。六種 Opening 均維持 Rain／Mosquito／Influencer false、blocked stall null。
+
+只在 session 保存 `openingConditionId` 與 `openingPending`。Render／Resize／Modal 重開只讀固定 Config，不重抽或重套 Modifier。HOME 清除 ID／Opening Lock，New Game 重建後重抽。Opening 不保存到 LocalStorage，不繼承上一局；不改 Player、Action、totalActions、Life、Statistics、Achievements、eventHistory 或已初始化的 nextEventAt。nextEventAt 保持新局原本的隨機 4～6，不因 Opening 重新抽。
+
+### Opening Modal / Interaction Lock
+
+正式流程維持 HOME → NIGHT_MARKET，沒有新增 Scene 或恢復 CHARACTER_SETUP。套用初始 Environment 後進入 NIGHT_MARKET，再顯示獨立 `opening-dialog`：「今晚的夜市……」、Opening 名稱、描述、「今晚的情況」與效果，以及「開始逛夜市」。背後 Stage 立即呈現新的正式 Initial Environment。
+
+Opening 使用獨立 `session.openingPending`，納入既有 `isInteractionLocked()`：Game、Food、正常 ActivityResult、攤位選擇、管理處、Home Card、Environment Trigger 均不可操作。Escape 的 cancel 被阻止，沒有 Timer，不進 Presentation Queue，不與 Event／Resource Modal 共用 Queue。`acknowledgeOpening()` 僅在本局 NIGHT_MARKET 且待確認時清除 Opening Lock；重複確認無效。Render 會關閉其他既有 Dialog，避免 New Game 開場與上一個 Dialog 疊加；HOME／RESULT 清除 Opening Lock 並關閉 Opening Modal。
+
+### 相容性
+
+Opening 是初始世界，不走 Mid-game Prepare／Notify／Commit，不寫 Event History。既有 Environment Engine、Event Eligibility 與交易流程不修改；NEW_YEAR 後自然排除已達上限的 CROWD_UP／PRICE_UP。Food Price、Game Reward 繼續讀正式 Level：週年慶 Food A 為 90，Game A reward Level 2 的 score 為 24／money reward 60。
+
+管理處模組完全未修改，只觀察 Opening 後正式 Environment，不讀 openingConditionId、不報「抽中哪個開局」。Opening 本身不呼叫 Achievement Evaluator，不增加 Rain／Mosquito Action 或攤位 Visit，仍只有原 19 個成就。Formal RESULT 完全保留 Step 6 的 Avatar／Name／Score／Achievement，不新增身分、開局或環境 Summary。Legacy Character Setup／Build UI、Paper Doll、Face／Clothes、Upload、Appearance Storage 保留且正式流程 bypass。
+
+### Core Tests
+
+`tests/core.test.mjs` **PASS**，新增並匯入 `tests/openings.test.mjs`：五種 Config 數值、default／invalid fallback、選擇只保存而不改資源／Progress、新局資源重置與 storage allowlist；六個唯一 Opening、總權重100、每段權重左右邊界、randomFn=1 fallback、六種 Environment 正確、Clamp 上下界；五種 Build × 六種固定抽樣驗證相同結果與單次抽樣；Opening 不改資源／Action／totalActions／History／Life／成就／nextEventAt／Storage；Render 全 State 不變；全部 Gameplay 入口鎖定、確認後解除、重複／錯誤 ID 確認無效；價格／獎勵透過原 Helper 生效；NEW_YEAR 邊界排除；HOME Cleanup 與第二局重新抽選。
+
+舊 Gameplay／Step 6 回歸新增明確的 `tests/gameplay-fixture.mjs`：使用正式 New Game 抽 NORMAL_NIGHT 並正式 acknowledge，才開始各自的既有測試。沒有在 production 加入 test-only skipOpening 路徑。
+
+### Browser / Responsive / Regression
+
+新增 `tests/openings.browser.cjs`，以 Playwright + **Edge headless** 的獨立本機 context 實测（非實體手機）：
+
+- HOME 上傳 Avatar、Name、選大學生、Refresh 還原 → 週年慶 Opening → HUD 110／800 → Escape 與等待超過原 Activity Timer 時長皆不能跳過 → 確認 → 管理處 → Game／Food → Rain Prepare／Confirm → Home → RESULT → HOME → 再抽 BUSY_MARKET，資源重新初始化，**PASS**。
+- 五種身分皆使用真實 Picker／開始按鈕，HUD 初始 stamina／maxStamina／money／score 正確；非法已保存 buildId Refresh fallback 社會人，**PASS**。
+- **320×844、390×844、390×900、430×932**：HOME Avatar 正圓、Name／身分資訊無水平 Overflow、開始按鈕在 Viewport 內；Build Modal 可選且在 Viewport 內。六種 Opening 每個尺寸皆驗證固定 State 不重抽、完整位於 Viewport、文案換行、確認可操作、無水平 Overflow，**PASS**。
+- 額外 **320×480** 驗證 Opening 使用內部 overflow-y:auto，確認按鈕可捲動到並操作。Gameplay 仍為固定 HUD／Stage、Stall Grid overflow-y:auto、無 Body Gameplay Scroll。
+- 已檢視 320px HOME／Opening 截圖，存系統 Temp `nml-step7-home-{width}x{height}.png`／`nml-step7-opening-{width}x{height}.png`，不加入 Repository。Step 7 Browser **Console Error 0**。
+- `tests/achievements.browser.cjs` **PASS**：Step 6 成就／正式 RESULT／Avatar／四尺寸回歸，Console Error 0。
+- `tests/environment-flow.browser.cjs` **PASS**：九種中途事件、Event → Resource 順序與四尺寸，Console Error 0。
+- `tests/management-office.browser.cjs` **PASS**：七組環境口語提示、Pending Lock、完整 State／Storage 零副作用與四尺寸，Console Error／Warning 0。
+
+舊 Browser suites 使用 `tests/gameplay-fixture.browser.cjs` 固定普通開場並明確確認後才進行原本的 Gameplay 測試，不改正式 Runtime。回歸時發現雨勢文案既有「濕答答」句子不含「雨」，原測試正則過窄；只將雨勢斷言補為「雨或濕答答」，未修改管理處文案／邏輯。
+
+本輪未新增 Achievement、Equipment、Clothing Gameplay、Stall、Mid-game Event、Small Random Event、外部遊戲串接、Backend、Leaderboard、PK、Login 或 Luck。完成後執行 git status／git diff／git diff --stat／git diff --check，不 Commit、不 Push，等待使用者確認。

@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { ACHIEVEMENT_CONFIG, ACHIEVEMENT_THRESHOLDS as T, evaluateAchievements as evaluate } from "../js/achievements.js";
 import { createGameState, gameState } from "../js/state.js";
 import { prepareEnvironmentEvent, commitPendingEnvironmentEvent, getEligibleEnvironmentEvents } from "../js/events.js";
-import { createNewGame, playTestGame, buyFood, applyActivityResult, clearActivityResultPresentation, acknowledgeResourceWarning, acknowledgeEnvironmentEvent, triggerEnvironmentEvent, requestEndGame } from "../js/game.js";
+import { playTestGame, buyFood, applyActivityResult, clearActivityResultPresentation, acknowledgeResourceWarning, acknowledgeEnvironmentEvent, triggerEnvironmentEvent, requestEndGame } from "../js/game.js";
+import { createNewGame } from './gameplay-fixture.mjs';
 import { render } from "../js/ui.js";
 
 const unlocked = (s, id) => s.achievements.find(a => a.id === id).unlocked;

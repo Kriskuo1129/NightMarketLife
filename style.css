@@ -19,6 +19,14 @@ main { width:min(100%,30rem); min-height:100dvh; margin:0 auto; padding:calc(env
 .eyebrow { margin:0 0 .25rem; color:#e7b478; font-size:.72rem; font-weight:800; letter-spacing:.15em; text-transform:uppercase; }
 h1,h2,p { overflow-wrap:anywhere; } h1 { margin:0; font-size:clamp(2.65rem,13vw,4.25rem); line-height:1; letter-spacing:.08em; text-shadow:.08em .08em 0 #4f261c; } h2 { margin:0; }
 .home-scene { padding:clamp(1rem,4vw,1.5rem); border-radius:.4rem; background:linear-gradient(180deg,#2a1915f5,#1d1210f5); box-shadow:0 .8rem 2.5rem #0006; }
+.home-build-picker { display:grid; gap:.3rem; width:100%; padding:.65rem .8rem; text-align:left; color:var(--nml-text); border:1px solid var(--nml-border); border-radius:.5rem; background:var(--nml-surface-dark); overflow-wrap:anywhere; }
+.home-build-picker>span:first-child,.home-build-picker small { color:var(--nml-muted); }
+.home-build-picker strong { color:var(--nml-gold); }
+.home-build-picker:hover { border-color:var(--nml-orange); }
+.home-build-picker:focus-visible { outline:2px solid var(--nml-gold); outline-offset:3px; }
+#home-build-dialog,#opening-dialog { max-height:calc(100dvh - 2rem); overflow-y:auto; overflow-wrap:anywhere; }
+#opening-effects { white-space:pre-line; line-height:1.7; color:var(--nml-muted); }
+#opening-dialog .primary-button { width:100%; }
 .signboard { position:relative; margin:0 0 .8rem; padding:.9rem .75rem .8rem; overflow:hidden; text-align:center; border:1px solid var(--nml-orange); border-radius:.35rem; background:linear-gradient(#241714,#160f0d); box-shadow:inset 0 0 1.5rem #d3833b16; }
 .signboard::after { content:""; position:absolute; inset:auto 18% 0; border-bottom:2px solid var(--nml-gold); opacity:.8; }
 .title-lights { position:absolute; inset:.35rem .45rem auto; display:flex; justify-content:space-between; }

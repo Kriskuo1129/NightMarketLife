@@ -12,11 +12,13 @@ const path = require('node:path');
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     await page.goto(process.env.NML_TEST_URL || 'http://127.0.0.1:4173/');
+    await require('./gameplay-fixture.browser.cjs')(page);
     const png = await page.evaluate(() => { const c = document.createElement('canvas'); c.width = c.height = 32; const ctx = c.getContext('2d'); ctx.fillStyle='#d3833b'; ctx.fillRect(0,0,32,32); return c.toDataURL(); });
     await page.locator('[data-upload="avatar"]').setInputFiles({ name:'avatar.png', mimeType:'image/png', buffer:Buffer.from(png.split(',')[1], 'base64') });
     await page.waitForFunction(() => !!window.NMLDebug.getState().player.profile.avatar);
     await page.locator('#player-name').fill('夜市旅人');
     await page.getByRole('button', { name:'開始遊戲', exact:true }).click();
+    await page.locator('[data-action="acknowledge-opening"]').click();
     assert.equal(await page.evaluate(() => window.NMLDebug.getState().session.scene), 'NIGHT_MARKET', JSON.stringify(errors));
     await page.evaluate(() => { window.NMLDebug.getState().progress.nextEventAt = 999; });
     const goHome = async () => {
@@ -42,8 +44,10 @@ const path = require('node:path');
     assert.doesNotMatch(storage, /achievement|unlocked|rainActions/);
     await result.getByRole('button', { name:'回首頁', exact:true }).click();
     await page.reload();
+    await require('./gameplay-fixture.browser.cjs')(page);
     assert.ok(await page.locator('[data-scene="HOME"] [data-avatar-image]').isVisible());
     await page.getByRole('button', { name:'開始遊戲', exact:true }).click();
+    await page.locator('[data-action="acknowledge-opening"]').click();
     assert.ok(await page.evaluate(() => window.NMLDebug.getState().achievements.every(a => !a.unlocked)));
 
     // Fixed-state resource boundaries still use the real successful-action path.
@@ -111,6 +115,7 @@ const path = require('node:path');
     assert.equal(await page.evaluate(() => JSON.stringify(window.NMLDebug.getState())),beforeRender);
     await result.getByRole('button',{name:'回首頁',exact:true}).click();
     await page.getByRole('button',{name:'開始遊戲',exact:true}).click();
+    await page.locator('[data-action="acknowledge-opening"]').click();
     assert.ok(await page.evaluate(() => window.NMLDebug.getState().achievements.every(a=>!a.unlocked)));
     assert.deepEqual(errors,[]);
     console.log('Step 6 browser: real game/food/home/result, avatar storage, resource/environment stories, empty/dense result, four mobile sizes PASS; console errors 0');

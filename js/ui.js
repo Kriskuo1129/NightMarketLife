@@ -5,6 +5,7 @@ import { renderAllCharacters } from "./character-renderer.js";
 import { getStallDisplayStatus } from "./stalls.js";
 import { getEffectiveFoodPrice, getEffectiveGameStaminaCost } from "./events.js";
 import { isInteractionLocked } from "./gameplay.js";
+import { getOpeningById } from "./openings.js";
 
 export const SCENES = Object.freeze({ HOME: "HOME", CHARACTER_SETUP: "CHARACTER_SETUP", NIGHT_MARKET: "NIGHT_MARKET", RESULT: "RESULT" });
 
@@ -53,9 +54,29 @@ export function render(gameState) {
     element.textContent = build?.[element.dataset.build] ?? "";
   });
   renderNightMarket(gameState);
+  document.querySelectorAll("[data-home-build]").forEach(element => {
+    element.textContent = build?.[element.dataset.homeBuild] ?? "";
+  });
   renderResult(gameState);
   const nameInput = document.querySelector("#player-name");
   if (nameInput && document.activeElement !== nameInput) nameInput.value = gameState.player.name;
+  renderOpening(gameState);
+}
+
+function renderOpening(gameState) {
+  const dialog = document.querySelector("#opening-dialog");
+  if (!dialog) return;
+  const opening = getOpeningById(gameState.session.openingConditionId);
+  if (gameState.session.scene !== SCENES.NIGHT_MARKET || !gameState.session.openingPending || !opening) {
+    if (dialog.open) dialog.close();
+    return;
+  }
+  // Opening has its own lock, no notification queue or timer.
+  document.querySelectorAll("dialog[open]").forEach(other => { if (other !== dialog) other.close(); });
+  dialog.querySelector("[data-opening-title]").textContent = opening.title;
+  dialog.querySelector("[data-opening-description]").textContent = opening.description;
+  dialog.querySelector("[data-opening-effects]").textContent = opening.effectLines.join("\n");
+  if (!dialog.open) dialog.showModal();
 }
 
 export function renderResult(gameState) {
@@ -81,20 +102,23 @@ export function changeScene(gameState, scene) {
     gameState.session.presentation = null;
     gameState.session.presentationQueue = [];
     gameState.session.pendingEnvironmentEvent = null;
+    gameState.session.openingPending = false;
+    if (scene === SCENES.HOME) gameState.session.openingConditionId = null;
     if (scene === SCENES.HOME) gameState.session.endReason = null;
   }
   gameState.session.scene = scene;
   render(gameState);
 }
 
-export function renderBuildOptions(gameState) {
-  const container = document.querySelector("[data-build-options]");
+export function renderBuildOptions(gameState, { home = false } = {}) {
+  const container = document.querySelector(home ? "[data-home-build-options]" : "[data-build-options]");
   if (!container) return;
   container.replaceChildren(...CONFIG.characterBuilds.map((build) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "build-option";
-    button.dataset.buildId = build.id;
+    if (home) button.dataset.homeBuildId = build.id;
+    else button.dataset.buildId = build.id;
     button.setAttribute("aria-pressed", String(build.id === gameState.player.buildId));
     const name = document.createElement("strong");
     name.textContent = build.name;

@@ -9,6 +9,7 @@ import { processCustomClothesImage, processCustomFaceImage } from "./uploads.js"
 import { DEFAULT_CLOTHES, FACE_ASSETS, SHOP_CLOTHES } from "../assets/character-assets.js";
 import { getManagementOfficeDialogue } from "./management-office.js";
 import { evaluateAchievements } from "./achievements.js";
+import { applyOpeningCondition, pickOpeningCondition } from "./openings.js";
 import { getResourceZeroWarning, getStallActivity, isInteractionLocked, predictStallAction, projectResources } from "./gameplay.js";
 import { checkEnvironmentEvent, commitPendingEnvironmentEvent, getEffectiveFoodPrice, getEffectiveGameStaminaCost, moveInfluencer, triggerEnvironmentEvent as triggerEvent } from "./events.js";
 
@@ -222,11 +223,12 @@ export function buyFood(stallId, randomFn = Math.random) {
   return activity;
 }
 
-export function createNewGame(characterSettings = loadCharacterSettings() ?? {}) {
+export function createNewGame(characterSettings = loadCharacterSettings() ?? {}, randomFn = Math.random) {
   document.querySelector("#management-office-dialog")?.close();
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   activityPresentationTimer = null;
   resetGameState(characterSettings);
+  initializeOpening(randomFn);
   changeScene(gameState, SCENES.NIGHT_MARKET);
   resetNightMarketScroll();
   return gameState;
@@ -237,12 +239,12 @@ function resetNightMarketScroll() {
   if (grid) grid.scrollTop = 0;
 }
 
-export function startNightMarketFromHome(name = "") {
+export function startNightMarketFromHome(name = "", randomFn = Math.random) {
   document.querySelector("#management-office-dialog")?.close();
   const legacyAppearance = loadCharacterSettings() ?? {};
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   activityPresentationTimer = null;
-  resetGameState({ ...legacyAppearance, name, buildId: CONFIG.defaults.buildId });
+  resetGameState({ ...legacyAppearance, name, buildId: gameState.player.buildId });
   const saved = saveCharacterSettings(gameState.player);
   if (!saved.ok) {
     setAvatarStatus("玩家資料無法保存，請更換較小的大頭貼後重試。");
@@ -250,9 +252,38 @@ export function startNightMarketFromHome(name = "") {
     return false;
   }
   setStatus("");
+  initializeOpening(randomFn);
   changeScene(gameState, SCENES.NIGHT_MARKET);
   resetNightMarketScroll();
   return gameState;
+}
+
+function initializeOpening(randomFn) {
+  const opening = pickOpeningCondition(randomFn);
+  applyOpeningCondition(gameState.environment, opening);
+  gameState.session.openingConditionId = opening.id;
+  gameState.session.openingPending = true;
+}
+
+export function acknowledgeOpening(expectedId = gameState.session.openingConditionId) {
+  if (gameState.session.scene !== SCENES.NIGHT_MARKET || !gameState.session.openingPending || expectedId !== gameState.session.openingConditionId) return false;
+  gameState.session.openingPending = false;
+  render(gameState);
+  return true;
+}
+
+export function selectHomeBuild(buildId) {
+  if (gameState.session.scene !== SCENES.HOME) return false;
+  const build = getBuildById(buildId) ?? getBuildById(CONFIG.defaults.buildId);
+  const name = document.querySelector("#player-name")?.value.trim() ?? gameState.player.name;
+  const saved = saveCharacterSettings({ ...gameState.player, name, buildId: build.id });
+  if (!saved.ok) { setAvatarStatus("身分設定無法保存，請稍後再試。"); return false; }
+  gameState.player.buildId = build.id;
+  gameState.player.name = name;
+  document.querySelector("#home-build-dialog")?.close();
+  setAvatarStatus("");
+  render(gameState);
+  return true;
 }
 
 function setAvatarStatus(message = "") {
@@ -261,6 +292,7 @@ function setAvatarStatus(message = "") {
 }
 
 function bindUI() {
+  document.querySelector("#opening-dialog")?.addEventListener("cancel", event => event.preventDefault());
   document.querySelector("#environment-event-dialog")?.addEventListener("cancel", event => event.preventDefault());
   document.querySelector("#resource-warning-dialog")?.addEventListener("cancel", event => event.preventDefault());
   document.addEventListener("submit", (event) => {
@@ -272,9 +304,15 @@ function bindUI() {
   document.addEventListener("click", (event) => {
     const button = event.target.closest("button");
     if (!button) return;
+    if (button.dataset.action === "acknowledge-opening") { acknowledgeOpening(); return; }
     if (button.dataset.action === "acknowledge-event") { acknowledgeEnvironmentEvent(); return; }
     if (button.dataset.action === "acknowledge-resource") { acknowledgeResourceWarning(); return; }
     if (isInteractionLocked(gameState) && gameState.session.scene === SCENES.NIGHT_MARKET) return;
+    if (button.dataset.action === "open-home-build" && gameState.session.scene === SCENES.HOME) {
+      renderBuildOptions(gameState, { home: true });
+      document.querySelector("#home-build-dialog")?.showModal();
+    }
+    if (button.dataset.homeBuildId) { selectHomeBuild(button.dataset.homeBuildId); return; }
     if (button.dataset.action === "show-pro") document.querySelector("#pro-dialog")?.showModal();
     if (button.dataset.action === "open-build") {
       renderBuildOptions(gameState);

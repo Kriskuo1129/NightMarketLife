@@ -12,7 +12,9 @@ const os = require('node:os');
     page.on('pageerror', error => errors.push(error.message));
     page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
     await page.goto(process.env.NML_TEST_URL || 'http://127.0.0.1:4173/');
+    await require('./gameplay-fixture.browser.cjs')(page);
     await page.getByRole('button', { name: '開始遊戲', exact: true }).click();
+    await page.locator('[data-action="acknowledge-opening"]').click();
     const setup = async (id, initial = {}) => page.evaluate(async ({ id, initial }) => {
       const debug = window.NMLDebug;
       debug.newGame({ buildId: 'worker' });

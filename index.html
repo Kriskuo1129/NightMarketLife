@@ -34,6 +34,11 @@
           </div>
         </div>
         <p class="avatar-status" data-avatar-status role="status" aria-live="polite"></p>
+        <button class="home-build-picker" type="button" data-action="open-home-build" aria-haspopup="dialog" aria-controls="home-build-dialog">
+          <span>今晚的身分</span><strong><span data-home-build="name"></span> ▾</strong>
+          <span>❤️ 體力 <span data-home-build="stamina"></span>　💰 金錢 <span data-home-build="money"></span></span>
+          <small data-home-build="description"></small>
+        </button>
         <button class="primary-button" type="submit">開始遊戲</button>
       </form>
       <div class="secondary-actions" aria-label="其他模式">
@@ -103,6 +108,8 @@
       <button class="primary-button" type="button" data-scene-target="HOME">回首頁</button>
     </section>
   </main>
+  <dialog id="home-build-dialog" aria-labelledby="home-build-title"><div class="dialog-card"><div class="dialog-heading"><h2 id="home-build-title">今晚的身分</h2><button type="button" data-close-dialog aria-label="關閉身分選擇">×</button></div><div class="build-options" data-home-build-options></div></div></dialog>
+  <dialog id="opening-dialog" aria-labelledby="opening-title" aria-describedby="opening-description opening-effects"><div class="dialog-card"><p class="eyebrow">今晚的夜市……</p><h2 id="opening-title" data-opening-title></h2><p id="opening-description" data-opening-description></p><h3>今晚的情況：</h3><p id="opening-effects" data-opening-effects></p><button class="primary-button" type="button" data-action="acknowledge-opening">開始逛夜市</button></div></dialog>
 
   <dialog id="environment-event-dialog" aria-labelledby="environment-event-title" aria-describedby="environment-event-description environment-event-effects"><div class="dialog-card"><p class="eyebrow">環境大事件</p><h2 id="environment-event-title" data-event-title></h2><p id="environment-event-description" data-event-description></p><h3>目前影響</h3><p id="environment-event-effects" data-event-effects></p><button class="primary-button" type="button" data-action="acknowledge-event">知道了</button></div></dialog>
   <dialog id="build-dialog" aria-labelledby="build-dialog-title"><div class="dialog-card"><div class="dialog-heading"><h2 id="build-dialog-title">選擇角色 Build</h2><button type="button" data-close-dialog aria-label="關閉">×</button></div><div class="build-options" data-build-options></div></div></dialog>

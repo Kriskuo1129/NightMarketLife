@@ -1,10 +1,10 @@
 export const CONFIG = Object.freeze({
   characterBuilds: Object.freeze([
-    { id: "high-school", name: "高中生", stamina: 120, money: 600, description: "體力充沛、預算較少。" },
-    { id: "college", name: "大學生", stamina: 110, money: 800, description: "體力與預算均衡。" },
-    { id: "worker", name: "社會人", stamina: 100, money: 1000, description: "穩定的一般起點。" },
-    { id: "middle-aged", name: "中年人", stamina: 85, money: 1300, description: "體力較少、資金充裕。" },
-    { id: "senior", name: "老年人", stamina: 70, money: 1600, description: "體力有限、起始資金最多。" }
+    { id: "high-school", name: "高中生", stamina: 120, money: 600, description: "體力滿滿，但零用錢得省著點花。" },
+    { id: "college", name: "大學生", stamina: 110, money: 800, description: "還很能走，口袋也比高中時寬裕一點。" },
+    { id: "worker", name: "社會人", stamina: 100, money: 1000, description: "體力和荷包都還算平均，今晚就正常逛吧。" },
+    { id: "middle-aged", name: "中年人", stamina: 85, money: 1300, description: "體力不像以前，但至少口袋比較有底氣。" },
+    { id: "senior", name: "老年人", stamina: 70, money: 1600, description: "慢慢逛沒關係，今天主要是不缺錢。" }
   ]),
   stallLife: Object.freeze({ min: 10, max: 20 }),
   staminaCosts: Object.freeze({ game: 10, food: 0, testWork: 25 }),
