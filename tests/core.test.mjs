@@ -17,7 +17,7 @@ globalThis.window = {};
 
 const { CONFIG } = await import("../js/config.js");
 const { createStall, cycleStallId, getStallDisplayStatus, getStallViewState, STALL_CONFIG, STALL_DISPLAY_STATUS, STALL_TYPES, INTERACTION_TYPES, TEST_GAME_RESULTS } = await import("../js/stalls.js");
-const { createAchievement, ACHIEVEMENT_RARITIES } = await import("../js/achievements.js");
+const { createAchievement } = await import("../js/achievements.js");
 const { gameState } = await import("../js/state.js");
 const { createNewGame, applyActivityResult, clearActivityResultPresentation, completeCharacterSetup, getStallPlaceholderCopy, playTestGame, selectStallAndScroll, setEnvironmentFlag, setInfluencer, setStallClosed, startNightMarketFromHome } = await import("../js/game.js");
 const { getEnvironmentStageView } = await import("../js/ui.js");
@@ -126,7 +126,7 @@ assert.equal(gameState.player.money, 1000);
 
 const stall = createStall({ id: "test", name: "測試攤", type: STALL_TYPES.GAME, interactionType: INTERACTION_TYPES.GAME });
 assert.ok(stall.life >= CONFIG.stallLife.min && stall.life <= CONFIG.stallLife.max);
-const achievement = createAchievement({ id: "test", name: "測試成就", rarity: ACHIEVEMENT_RARITIES.COMMON, description: "測試" });
+const achievement = createAchievement({ id: "test", name: "測試成就", description: "測試" });
 assert.equal(achievement.unlocked, false);
 
 assert.equal(STALL_CONFIG.length, 7);
@@ -892,4 +892,5 @@ assert.equal(officeModal.open, false);
 assert.equal(openManagementOffice(), false);
 document.querySelector = beforeOfficeQuery;
 clearActivityResultPresentation();
+await import("./achievements.test.mjs");
 console.log("NightMarketLife core tests: PASS");

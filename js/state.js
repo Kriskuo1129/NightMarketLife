@@ -1,6 +1,6 @@
 import { createPlayer } from "./character.js";
 import { createEnvironment, createActiveEvents, getNextEventInterval } from "./events.js";
-import { createInitialAchievements } from "./achievements.js";
+import { createInitialAchievements, createAchievementTracking } from "./achievements.js";
 import { createInitialStalls } from "./stalls.js";
 
 export function createProgress(randomFn = Math.random) {
@@ -21,7 +21,7 @@ export function createGameState(characterSettings = {}) {
     activeEvents: createActiveEvents(),
     statistics: createStatistics(),
     achievements: createInitialAchievements(),
-    session: { scene: "HOME", lastActivitySourceId: null, selectedStallId: stalls[0]?.id ?? null, presentation: null, presentationQueue: [], pendingEnvironmentEvent: null, endReason: null }
+    session: { scene: "HOME", lastActivitySourceId: null, selectedStallId: stalls[0]?.id ?? null, presentation: null, presentationQueue: [], pendingEnvironmentEvent: null, endReason: null, achievementTracking: createAchievementTracking() }
   };
 }
 

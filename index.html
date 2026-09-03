@@ -86,7 +86,7 @@
 
     <section class="scene result-scene" data-scene="RESULT" aria-labelledby="result-title" hidden>
       <p class="eyebrow">Tonight's Result</p>
-      <h2 id="result-title">結算功能將於後續 Step 實作</h2>
+      <h2 id="result-title">今晚的夜市回顧</h2>
       <div class="result-identity">
         <span class="avatar-frame avatar-frame--result">
           <img data-avatar-image alt="玩家大頭貼" hidden>
@@ -94,7 +94,12 @@
         </span>
         <p class="result-player"><strong data-player="name"></strong>，今晚先逛到這裡。</p>
       </div>
-      <dl class="result-stats"><div><dt>⭐ 精彩分數</dt><dd data-player="score"></dd></div><div><dt>💰 金錢</dt><dd data-player="money"></dd></div><div><dt>❤️ 體力</dt><dd data-player="stamina"></dd></div></dl>
+      <dl class="result-score"><dt>今晚精彩分數</dt><dd data-player="score"></dd></dl>
+      <section class="result-stories" aria-labelledby="result-stories-title">
+        <h3 id="result-stories-title">今晚的你</h3>
+        <ul class="result-achievements" data-result-achievements></ul>
+        <p class="result-empty" data-result-empty>今晚平平安安地逛完了夜市。</p>
+      </section>
       <button class="primary-button" type="button" data-scene-target="HOME">回首頁</button>
     </section>
   </main>
@@ -121,7 +126,7 @@
     <div class="dialog-card compact-dialog">
       <p class="eyebrow">Going Home</p>
       <h2 id="home-dialog-title">今晚就先回家嗎？</h2>
-      <p>正式結算還在準備中，現在回家會先前往結果 Placeholder。</p>
+      <p>今晚先逛到這裡嗎？回家看看今晚留下的精彩回憶。</p>
       <div class="confirmation-actions">
         <button class="modal-secondary-button" type="button" data-close-dialog>繼續逛</button>
         <button class="primary-button" type="button" data-action="confirm-home">回家</button>

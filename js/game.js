@@ -8,6 +8,7 @@ import { changeClothes, changeFace, setCustomAppearance } from "./character-setu
 import { processCustomClothesImage, processCustomFaceImage } from "./uploads.js";
 import { DEFAULT_CLOTHES, FACE_ASSETS, SHOP_CLOTHES } from "../assets/character-assets.js";
 import { getManagementOfficeDialogue } from "./management-office.js";
+import { evaluateAchievements } from "./achievements.js";
 import { getResourceZeroWarning, getStallActivity, isInteractionLocked, predictStallAction, projectResources } from "./gameplay.js";
 import { checkEnvironmentEvent, commitPendingEnvironmentEvent, getEffectiveFoodPrice, getEffectiveGameStaminaCost, moveInfluencer, triggerEnvironmentEvent as triggerEvent } from "./events.js";
 
@@ -38,6 +39,7 @@ export function applyActivityResult(result, { mosquito = false, deferNotificatio
   gameState.progress.actionCount += activity.progressCost;
   gameState.statistics.totalActions += activity.progressCost;
   gameState.session.lastActivitySourceId = activity.sourceId || null;
+  evaluateAchievements(gameState, { before, raining: gameState.environment.raining });
   const resourceWarning = getResourceZeroWarning(before, player);
   if (resourceWarning && !deferNotification) enqueuePresentation(resourceWarning);
   render(gameState);
@@ -116,6 +118,7 @@ function presentEvent(event) {
 export function acknowledgeEnvironmentEvent(expected = gameState.session.presentation) {
   if (expected !== gameState.session.presentation || expected?.type !== "ENVIRONMENT_EVENT_MODAL") return false;
   if (!commitPendingEnvironmentEvent(gameState, expected.pendingEvent)) return false;
+  evaluateAchievements(gameState);
   gameState.session.presentation = null;
   return advancePresentation();
 }
@@ -123,6 +126,7 @@ export function acknowledgeEnvironmentEvent(expected = gameState.session.present
 export function requestEndGame(reason) {
   if (reason !== "HOME" || isInteractionLocked(gameState)) return false;
   gameState.session.endReason = reason;
+  evaluateAchievements(gameState, { settlement: true });
   changeScene(gameState, SCENES.RESULT);
   return true;
 }
@@ -142,7 +146,12 @@ export function triggerEnvironmentEvent(randomFn = Math.random) {
 }
 
 function completeStallAction(stall, activity, randomFn) {
+  const lifeBefore = stall.life;
   consumeStallLife(stall);
+  evaluateAchievements(gameState, {
+    foodAction: stall.type === STALL_TYPES.FOOD && activity.appliedDeltas.staminaDelta > 0,
+    foodClosed: stall.type === STALL_TYPES.FOOD && lifeBefore > 0 && stall.life === 0 && stall.isClosed
+  });
   let event = null;
   if (gameState.progress.actionCount >= gameState.progress.nextEventAt) {
     // Preserve the existing movement-before-event draw order, but stage all

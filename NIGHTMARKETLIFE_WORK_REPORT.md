@@ -961,3 +961,77 @@ Rain、Mosquito、Influencer 各有至少三句；Influencer 會將正式 blocke
 320×844、390×844、390×900、430×932 各以多次複合環境長對話測試：Modal 完整位於 Viewport、文字安全換行、無內容／頁面水平 Overflow、無 Body Gameplay Scroll、問話與關閉按鈕可見可操作。Modal 保留 max-height 與內部 overflow-y:auto；已檢視 320px 截圖。管理處 Browser suite Console Error／Warning 0。另重跑 `tests/environment-flow.browser.cjs`，九種事件、Event → Resource 順序與四尺寸皆 PASS。
 
 本輪僅實作 Step 5 管理處對話，沒有新增事件、成就、結算、裝備、服飾 Gameplay、Stall、後端或 Luck；沒有更動既有 Environment Transaction 或 Gameplay 規則。完成後檢查 git status／git diff，不 Commit、不 Push，等待確認。
+
+## Step 6：Achievement System + Formal RESULT
+
+### 單局故事定位 / Model / Config
+
+成就描述「玩家今晚發生了什麼」，不是永久收藏。正式 Model 為 `{ id, name, description, unlocked }`，共 19 個，名稱全部四個中文字；移除舊 `ACHIEVEMENT_RARITIES` 與 rarity 驗證，不存在正式稀有度 Gameplay dependency。「關門專家」不實作。
+
+`js/achievements.js` 集中 `ACHIEVEMENT_CONFIG`、`ACHIEVEMENT_THRESHOLDS`、`createInitialAchievements()`、`createAchievementTracking()` 與 `evaluateAchievements(state, context)`。UI／Click Handler 不自行解鎖；成就只改變本局 achievements 與其最小歷史 tracking，不改資源、Stall Life、Environment、Action Count、nextEventAt 或 Gameplay Modifier。不新增獎勵、Blocking Modal、動畫提示或通知 Queue。
+
+### 19 個正式成就
+
+| ID | 四字名稱 | 正式第一版条件 |
+| --- | --- | --- |
+| COME_ALL_THE_WAY | 來都來了 | 各 Game 的 gamePlays 合計 ≥ 3 |
+| CANT_STOP | 欲罷不能 | gamePlays 合計 ≥ 8 |
+| HOT_HAND | 手感正熱 | score ≥ 300 |
+| NIGHT_MARKET_LEGEND | 夜市傳奇 | score ≥ 800 |
+| BIG_EATER | 大吃特吃 | foodPurchases ≥ 3 |
+| HERE_TO_EAT | 專程來吃 | foodPurchases ≥ 3 且大於 gamePlays 合計 |
+| THE_USUAL | 老闆照舊 | 同一 Food Stall 的 stallVisits ≥ 3 |
+| EAT_UNTIL_CLOSE | 吃到收攤 | 本次成功 Food Action 使該攤 Life 從正值變成 0 且 Closed |
+| EXHAUSTED | 精疲力盡 | 成功 Action 使 stamina 從正值變成 0 |
+| BROKE | 身無分文 | 成功 Action 使 money 從正值變成 0 |
+| ROCK_BOTTOM | 山窮水盡 | Gameplay 曾同時 stamina = 0、money = 0，不要求同次歸零 |
+| COMEBACK | 東山再起 | 曾經體力歸零，之後成功 Food Action 實際回復體力至正值 |
+| WALK_IN_RAIN | 雨中漫步 | 正式 raining 期間成功 Action ≥ 2 |
+| HUMAN_MOSQUITO_COIL | 人體蚊香 | 既有 statistics.mosquitoActions ≥ 3 |
+| WHO_IS_THAT | 那到底誰 | 已 Commit 的 eventHistory 含 INFLUENCER |
+| TRY_EVERYTHING | 雨露均霑 | 動態取得全部 isSpecial === false 且 GAME／FOOD 的攤位，每攤 stallVisits ≥ 1 |
+| STILL_WANT_MORE | 意猶未盡 | 確認回家時 stamina ≥ 50 且 money ≥ 500 |
+| EMPTY_POCKETS | 兩袖清風 | 確認回家時 money = 0 |
+| NOTHING_LEFT | 一乾二淨 | 確認回家時 stamina = 0 且 money = 0 |
+
+所有門檻集中在 `ACHIEVEMENT_THRESHOLDS`。score 300／800，以及回家 stamina 50／money 500，皆為 **Phase 1 Temporary Balance**，第二階段接入正式遊戲後必須重新平衡；沒有改動現有測試遊戲分數。成就描述集中於 Config；「手感正熱」文案為「今晚手感正好，再玩一攤也不嫌多。」；其餘沿用需求指定故事描述。
+
+### 判定邊界 / 最小 Tracking / Environment Transaction
+
+成功 `applyActivityResult()` 套用實際資源後，以瞬時 before 資源紀錄歸零轉換，並讀取此 Action 使用的正式 raining。未完成／被禁止的 Action 不記錄。Game／Food 完成統計與 Life 消耗後，共用 `completeStallAction()` 再判定；Food 導致收攤以當次 Life 前後差異確認，不能只看 Closed。Food Recovery 必須是成功 Food 且實際體力增加，不把其他資源回復或滿體力購買算成回復。
+
+`session.achievementTracking` 僅保存五個布林值 `staminaZero`、`moneyZero`、`bothZero`、`foodRecovery`、`foodClosure`，以及一個 `rainActions` 計數。既有 gamePlays、foodPurchases、mosquitoActions、stallVisits、eventHistory、score 直接使用，不複製大型 Statistics／Action History／Snapshot。
+
+Environment Prepare 不呼叫成就判定；Evaluator 不讀 pendingEnvironmentEvent.projected。RAIN_START 由某 Action Prepare 時，那次 Action 不算雨中行動；Commit 後下一個成功 Action 才計數。INFLUENCER 只看正式 eventHistory，`acknowledgeEnvironmentEvent()` 成功 Commit 後才呼叫 Evaluator；Pending、stale confirm、僅 Debug setInfluencer 不會提前解鎖。Rain／Mosquito／Influencer 的原有 Prepare → Notify → Commit、移動與事件 History Timing 都保留。
+
+只有 `requestEndGame("HOME")` 通過既有 Interaction Lock、正式確認回家後，才以 settlement context 判定最後三個成就，再進 RESULT。一般 Render、Resize、開啟／取消回家 Confirmation 都不判定結算。解鎖保持單向直到 New Game；完全不插入 Presentation，因此 Activity Result → Event Modal → Commit → Resource Warning 順序不變。
+
+### Formal RESULT / New Game / Storage Policy
+
+RESULT 正式成為「今晚的夜市回顧」：保留圓形 Avatar 與名稱，空名顯示 `-沒輸入名稱-`；以大字暖金色顯示「今晚精彩分數」，下方「今晚的你」只列已解鎖四字名稱與故事描述。以 textContent 建立清單，不使用來源文字拼接 HTML。取消正式畫面上的 money／stamina Debug 資訊（GameState 仍保留），不顯示 locked、rarity、完成百分比或 0/19。
+
+沒有成就時顯示「今晚平平安安地逛完了夜市。」；大量成就使用一般頁面垂直捲動，不縮小文字硬塞 Viewport。「回首頁」維持原流程，回家 Confirmation 改為正式回顧文案。RESULT Render 只更新 DOM，不評估或修改成就。
+
+每次 New Game／HOME 開始遊戲透過既有 resetGameState 重建 19 個 locked 成就與全部 tracking，上一局不繼承。沒有新增 LocalStorage Key，沒有 Storage Migration；Character Settings 仍只存原本允許的外觀／Avatar／名稱等設定，不保存 achievement／unlocked／tracking。Avatar Upload 與 Refresh 還原維持原流程。
+
+### Core Tests
+
+`tests/core.test.mjs` **PASS**，新增並匯入 `tests/achievements.test.mjs`（透過 core 的 DOM／Storage 測試環境執行）。覆蓋：19 個唯一 ID、四中文字、Model 欄位、無 rarity／關門專家；Game／Score／Food／Mosquito 門檻邊界；Food 多於 Game 與最低購買量；Food per-stall／非 Food 不成立；動態新 Food 納入雨露均霑；實際 Food 收攤、Game 收攤不成立；資源先後歸零、初始 Debug 零值不冒充正值歸零；Food 回復、非 Food 回復／滿體力購買不成立；Rain 兩次成功 Action、未完成／體力不足不計數；Pending INFLUENCER 不成立而正式確認成立；觸發雨的 Action 不算雨中、Commit 後才計；三個回家成就與門檻邊界；New Game 全重置；純判定前後 resources／Environment／Life／progress／statistics／Queue／Storage 不變；RESULT 重複 Render 的完整 State 相同。
+
+既有 Core 回歸仍全數 PASS，涵蓋 Avatar／Custom Assets／Legacy、Gameplay、Food、Entry Restriction、Resource Warning、Life／Closed、Environment Transaction、管理處與 Storage。
+
+### Browser / Responsive / Regression Results
+
+新增 `tests/achievements.browser.cjs`，Playwright + **Edge headless** 本機獨立測試 context（不是實體手機硬體）：
+
+- 真實 UI 操作 HOME 上傳 Avatar、填名稱 → NIGHT_MARKET → 三次 Food、三個 Game → Home Card → Confirmation → RESULT → HOME；驗證多個 Gameplay 成就、score 60、Avatar 圖片已解碼、RESULT 不含資源 Debug 欄位。
+- Reload 後 Avatar 還原，開始新局成就全 locked；LocalStorage 不含 achievement／unlocked／rainActions。
+- Debug 固定初始狀態搭配正式 Action／Warning／回家，驗證 stamina 歸零、money 歸零、雙資源歸零及回家成就。
+- Rain／Mosquito 正式 Action、多攤位 Visit、INFLUENCER Pending 不解鎖／按「知道了」後解鎖，RESULT 顯示正確。
+- 空成就、空名稱與 17 個成就的密集回顧 fixture；回家／回首頁可操作，Resize／Render 前後完整 GameState 一致。
+- **320×844、390×844、390×900、430×932 全 PASS**：無水平 Overflow，Avatar 寬高相同／50% 圓形，描述文字正常換行且 ≥14px，多成就垂直 Scroll，底部回首頁按鈕可到達。已檢視 320px 全頁截圖。截圖存系統 Temp `nml-step6-result-{width}x{height}.png`，未加入 Repository。
+- Step 6 Browser **Console Error 0**。
+- 重跑 `tests/environment-flow.browser.cjs` **PASS**：九種事件 Rain Start／Stop、Mosquito Start／Stop、Crowd Up、Price Up、Reward Up、Influencer Start／Leave，通知順序與四尺寸皆正常，Console Error 0。
+- 重跑 `tests/management-office.browser.cjs` **PASS**：七種環境口語提示、反覆詢問零副作用、Pending Lock、Commit 後資訊、HOME Cleanup、四尺寸，Console Error／Warning 0。
+
+本輪沒有實作下一階段、Build Selection、Opening Event、新攤位、服飾 Gameplay、Equipment、永久成就收藏、百科／完成率、後端／Login、Leaderboard、正式外部遊戲或 Luck。Gameplay 規則／Balance／Environment Flow 與 Legacy Paper Doll 均保留。完成後檢查 git status／git diff／git diff --stat；不 Commit、不 Push，交由使用者確認。

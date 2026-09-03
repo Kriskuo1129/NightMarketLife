@@ -53,8 +53,26 @@ export function render(gameState) {
     element.textContent = build?.[element.dataset.build] ?? "";
   });
   renderNightMarket(gameState);
+  renderResult(gameState);
   const nameInput = document.querySelector("#player-name");
   if (nameInput && document.activeElement !== nameInput) nameInput.value = gameState.player.name;
+}
+
+export function renderResult(gameState) {
+  const list = document.querySelector("[data-result-achievements]");
+  if (!list) return;
+  const unlocked = gameState.achievements.filter(item => item.unlocked);
+  list.replaceChildren(...unlocked.map(achievement => {
+    const item = document.createElement("li");
+    const title = document.createElement("h4");
+    title.textContent = `🏆 ${achievement.name}`;
+    const description = document.createElement("p");
+    description.textContent = achievement.description;
+    item.append(title, description);
+    return item;
+  }));
+  const empty = document.querySelector("[data-result-empty]");
+  if (empty) empty.hidden = unlocked.length > 0;
 }
 
 export function changeScene(gameState, scene) {
