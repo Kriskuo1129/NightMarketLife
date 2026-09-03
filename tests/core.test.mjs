@@ -335,7 +335,12 @@ for (const id of ["management", "clothing"]) {
 clearActivityResultPresentation();
 // Step 4D deterministic lifecycle, modifiers and presentation sequencing.
 const { createGameState, createProgress } = await import("../js/state.js");
-const { getNextEventInterval, getEligibleEnvironmentEvents, pickEnvironmentEvent, pickLevelDelta, applyEnvironmentEvent, triggerEnvironmentEvent: triggerStateEvent, checkEnvironmentEvent, pickInfluencerTarget, moveInfluencer, getEffectiveGameStaminaCost, getEffectiveFoodPrice, applyRewardModifier } = await import("../js/events.js");
+const { getNextEventInterval, getEligibleEnvironmentEvents, pickEnvironmentEvent, pickLevelDelta, prepareEnvironmentEvent, commitPendingEnvironmentEvent, triggerEnvironmentEvent: triggerStateEvent, checkEnvironmentEvent, pickInfluencerTarget, moveInfluencer, getEffectiveGameStaminaCost, getEffectiveFoodPrice, applyRewardModifier } = await import("../js/events.js");
+// Existing event-effect regression cases explicitly confirm their prepared event.
+const applyEnvironmentEvent = (state, id, randomFn) => {
+  const pending = prepareEnvironmentEvent(state, id, randomFn);
+  return pending ? commitPendingEnvironmentEvent(state, pending, randomFn) : null;
+};
 const { advancePresentation, acknowledgeEnvironmentEvent, triggerEnvironmentEvent: debugTriggerEvent } = await import("../js/game.js");
 assert.equal(getNextEventInterval(() => 0), 4);
 assert.equal(getNextEventInterval(() => .5), 5);
@@ -350,6 +355,10 @@ assert.equal(checkEnvironmentEvent(eventState, () => 0), null);
 assert.equal(eventState.statistics.eventHistory.length, 0);
 eventState.progress.actionCount = 4;
 assert.equal(checkEnvironmentEvent(eventState, () => 0).eventId, "RAIN_START");
+assert.equal(eventState.environment.raining, false);
+assert.equal(eventState.progress.nextEventAt, 4);
+assert.equal(eventState.statistics.eventHistory.length, 0);
+commitPendingEnvironmentEvent(eventState, eventState.session.pendingEnvironmentEvent, () => 0);
 assert.equal(eventState.progress.nextEventAt, 8);
 assert.equal(eventState.statistics.eventHistory.length, 1);
 assert.equal(eventState.statistics.eventHistory[0].actionCount, 4);
@@ -395,6 +404,8 @@ moveInfluencer(eventState, () => 0);
 assert.equal(eventState.environment.influencerBlockedStallId, null);
 assert.equal(eventState.environment.influencer, true);
 assert.equal(triggerStateEvent(eventState, () => 0).eventId, "INFLUENCER_LEAVE");
+assert.equal(eventState.environment.influencer, true);
+commitPendingEnvironmentEvent(eventState);
 assert.equal(eventState.environment.influencer, false);
 assert.equal(eventState.environment.influencerBlockedStallId, null);
 eventState = createGameState();
@@ -403,6 +414,7 @@ const remainingEvent = triggerStateEvent(eventState, () => .9);
 assert.notEqual(remainingEvent.eventId, "INFLUENCER");
 assert.notEqual(remainingEvent.eventId, "INFLUENCER_LEAVE");
 assert.equal(eventState.environment.influencer, true);
+commitPendingEnvironmentEvent(eventState);
 assert.equal(eventState.statistics.eventHistory.length, 2);
 
 createNewGame({ buildId: "worker" });
@@ -469,8 +481,8 @@ createNewGame({ buildId: "worker" });
 gameState.progress.nextEventAt = 1;
 const firstActual = playTestGame("game_01", () => 0);
 assert.equal(firstActual.appliedDeltas.staminaDelta, -10); // event affects next action, not this one
-assert.equal(gameState.environment.raining, true);
-assert.equal(gameState.progress.nextEventAt, 5);
+assert.equal(gameState.environment.raining, false);
+assert.equal(gameState.progress.nextEventAt, 1);
 assert.equal(gameState.session.presentation.type, "ACTIVITY_RESULT");
 assert.equal(gameState.session.presentationQueue.length, 1);
 assert.equal(gameState.session.presentationQueue[0].type, "ENVIRONMENT_EVENT_MODAL");
@@ -482,7 +494,7 @@ acknowledgeEnvironmentEvent();
 assert.equal(gameState.session.presentation, null);
 assert.equal(gameState.environment.raining, true);
 debugTriggerEvent(() => 0);
-assert.equal(gameState.environment.raining, false);
+assert.equal(gameState.environment.raining, true);
 assert.equal(gameState.session.presentation.eventId, "RAIN_STOP");
 const stalePresentation = gameState.session.presentation;
 createNewGame({ buildId: "worker" });
@@ -545,13 +557,13 @@ assert.equal(advancePresentation(), false);
 assert.equal(playTestGame("game_01"), false);
 assert.equal(buyFood("food_01"), false);
 assert.equal(snapshot(), modalSnapshot);
-debugTriggerEvent(() => 0); // next event queues without replacing current modal
+assert.equal(debugTriggerEvent(() => 0), false); // Pending cannot re-draw or queue a second event.
 assert.equal(gameState.session.presentation, pendingModal);
 assert.equal(acknowledgeEnvironmentEvent(), true);
-assert.equal(fakeModal.open, true);
-assert.equal(gameState.session.presentation.eventId, "RAIN_STOP");
-advancePresentation();
+assert.equal(fakeModal.open, false);
+assert.equal(gameState.session.presentation, null);
 assert.equal(modalOpens, 1);
+debugTriggerEvent(() => 0);
 const oldModal = gameState.session.presentation;
 createNewGame();
 assert.equal(fakeModal.open, false);
@@ -712,5 +724,97 @@ assert.equal(isInteractionLocked(gameState), false);
 assert.ok(!revisionHtml.includes("data-entry-warning"));
 assert.ok(!revisionHtml.includes("end-reason-dialog"));
 assert.ok(revisionHtml.includes("resource-warning-dialog"));
+clearActivityResultPresentation();
+
+// Environment transactions: all random decisions are prepared once, effects commit once.
+freshFlow();
+setInfluencer(true, "game_01");
+gameState.progress.nextEventAt = 1;
+let transactionDraw = 0;
+buyFood("food_01", () => ++transactionDraw === 2 ? .99 : 0);
+assert.equal(gameState.environment.influencerBlockedStallId, "game_01");
+assert.equal(gameState.session.pendingEnvironmentEvent.projected.influencerBlockedStallId, "game_02");
+assert.equal(gameState.session.pendingEnvironmentEvent.eventId, "RAIN_START");
+advancePresentation();
+acknowledgeEnvironmentEvent();
+assert.equal(gameState.environment.influencerBlockedStallId, "game_02");
+assert.equal(gameState.environment.raining, true);
+for (const [id, before, projected] of [
+  ["RAIN_START", { raining: false }, { raining: true }],
+  ["RAIN_STOP", { raining: true }, { raining: false }],
+  ["MOSQUITO_START", { mosquito: false }, { mosquito: true }],
+  ["MOSQUITO_STOP", { mosquito: true }, { mosquito: false }],
+  ["PRICE_UP", { priceLevel: 1 }, { priceLevel: 2 }],
+  ["PRICE_DOWN", { priceLevel: 2 }, { priceLevel: 1 }],
+  ["REWARD_UP", { rewardLevel: 1 }, { rewardLevel: 2 }],
+  ["REWARD_DOWN", { rewardLevel: 2 }, { rewardLevel: 1 }],
+  ["CROWD_UP", { crowdLevel: 3 }, { crowdLevel: 4 }],
+  ["CROWD_DOWN", { crowdLevel: 3 }, { crowdLevel: 2 }],
+  ["INFLUENCER", { influencer: false, influencerBlockedStallId: null }, { influencer: true, influencerBlockedStallId: "food_01" }],
+  ["INFLUENCER_LEAVE", { influencer: true, influencerBlockedStallId: "food_01" }, { influencer: false, influencerBlockedStallId: null }]
+]) {
+  freshFlow();
+  Object.assign(gameState.environment, before);
+  const official = JSON.stringify(gameState.environment);
+  const history = JSON.stringify(gameState.statistics.eventHistory);
+  const threshold = gameState.progress.nextEventAt;
+  const pending = prepareEnvironmentEvent(gameState, id, () => id === "INFLUENCER" ? .65 : 0);
+  assert.deepEqual(pending.projected, projected);
+  assert.equal(JSON.stringify(gameState.environment), official);
+  assert.equal(JSON.stringify(gameState.statistics.eventHistory), history);
+  assert.equal(gameState.progress.nextEventAt, threshold);
+  assert.equal(isInteractionLocked(gameState), true);
+  assert.equal(playTestGame("game_01"), false);
+  assert.equal(triggerStateEvent(gameState, () => { throw new Error("Pending event redrawn"); }), pending);
+  const stablePending = JSON.stringify(pending);
+  render(gameState); render(gameState);
+  assert.equal(JSON.stringify(gameState.session.pendingEnvironmentEvent), stablePending);
+  if (id === "PRICE_UP") assert.match(pending.ui.effectLines[0], /×1\.2/);
+  if (id === "RAIN_START") assert.equal(getEffectiveGameStaminaCost(findStall("game_01"), gameState.environment), 10);
+  if (id === "INFLUENCER") {
+    assert.match(pending.ui.effectLines[0], /測試小吃攤 A/);
+    assert.equal(getStallDisplayStatus(findStall("food_01"), gameState.environment).canEnter, true);
+  }
+  assert.ok(commitPendingEnvironmentEvent(gameState, pending, () => 0));
+  for (const [key, value] of Object.entries(projected)) assert.equal(gameState.environment[key], value);
+  assert.equal(gameState.session.pendingEnvironmentEvent, null);
+  assert.equal(gameState.statistics.eventHistory.length, 1);
+  assert.deepEqual(gameState.statistics.eventHistory[0], { eventId: id, actionCount: 0, details: pending.details });
+  assert.equal(gameState.progress.nextEventAt, 4);
+  assert.equal(commitPendingEnvironmentEvent(gameState, pending), null);
+  assert.equal(gameState.statistics.eventHistory.length, 1);
+  if (id === "RAIN_START") assert.equal(playTestGame("game_01", () => 0).staminaDelta, -15);
+}
+freshFlow();
+gameState.player.stamina = 10;
+gameState.progress.nextEventAt = 1;
+playTestGame("game_01", () => 0);
+assert.equal(gameState.player.stamina, 0);
+assert.equal(gameState.environment.raining, false);
+assert.equal(gameState.statistics.eventHistory.length, 0);
+const savedWarning = gameState.session.presentationQueue[1];
+advancePresentation();
+assert.equal(gameState.environment.raining, false);
+const notifiedEvent = gameState.session.presentation;
+acknowledgeEnvironmentEvent();
+assert.equal(gameState.environment.raining, true);
+assert.equal(gameState.session.presentation, savedWarning);
+assert.equal(acknowledgeEnvironmentEvent(notifiedEvent), false);
+acknowledgeResourceWarning();
+assert.equal(gameState.session.scene, "NIGHT_MARKET");
+assert.equal(isInteractionLocked(gameState), false);
+for (const cleanup of [() => createNewGame(), () => window.NMLDebug.changeScene("HOME"), () => changeScene(gameState, "HOME")]) {
+  freshFlow();
+  debugTriggerEvent(() => 0);
+  const pending = gameState.session.pendingEnvironmentEvent;
+  const modal = gameState.session.presentation;
+  cleanup();
+  assert.equal(gameState.session.pendingEnvironmentEvent, null);
+  assert.equal(commitPendingEnvironmentEvent(gameState, pending), null);
+  assert.equal(acknowledgeEnvironmentEvent(modal), false);
+  assert.equal(gameState.environment.raining, false);
+  assert.equal(gameState.statistics.eventHistory.length, 0);
+  assert.equal(isInteractionLocked(gameState), false);
+}
 clearActivityResultPresentation();
 console.log("NightMarketLife core tests: PASS");

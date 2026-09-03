@@ -21,7 +21,7 @@ export function createGameState(characterSettings = {}) {
     activeEvents: createActiveEvents(),
     statistics: createStatistics(),
     achievements: createInitialAchievements(),
-    session: { scene: "HOME", lastActivitySourceId: null, selectedStallId: stalls[0]?.id ?? null, presentation: null, presentationQueue: [], endReason: null }
+    session: { scene: "HOME", lastActivitySourceId: null, selectedStallId: stalls[0]?.id ?? null, presentation: null, presentationQueue: [], pendingEnvironmentEvent: null, endReason: null }
   };
 }
 

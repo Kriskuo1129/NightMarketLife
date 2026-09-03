@@ -8,7 +8,7 @@ import { changeClothes, changeFace, setCustomAppearance } from "./character-setu
 import { processCustomClothesImage, processCustomFaceImage } from "./uploads.js";
 import { DEFAULT_CLOTHES, FACE_ASSETS, SHOP_CLOTHES } from "../assets/character-assets.js";
 import { getResourceZeroWarning, getStallActivity, isInteractionLocked, predictStallAction, projectResources } from "./gameplay.js";
-import { checkEnvironmentEvent, getEnvironmentEventUI, getEffectiveFoodPrice, getEffectiveGameStaminaCost, moveInfluencer, triggerEnvironmentEvent as triggerEvent } from "./events.js";
+import { checkEnvironmentEvent, commitPendingEnvironmentEvent, getEffectiveFoodPrice, getEffectiveGameStaminaCost, moveInfluencer, triggerEnvironmentEvent as triggerEvent } from "./events.js";
 
 export function normalizeActivityResult(result = {}) {
   return {
@@ -62,6 +62,7 @@ export function clearActivityResultPresentation(presentation = gameState.session
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   gameState.session.presentation = null;
   gameState.session.presentationQueue = [];
+  gameState.session.pendingEnvironmentEvent = null;
   activityPresentationTimer = null;
   render(gameState);
   return true;
@@ -108,12 +109,12 @@ export function advancePresentation(expected = gameState.session.presentation) {
 
 function presentEvent(event) {
   if (!event) return;
-  const ui = getEnvironmentEventUI(event, gameState);
-  enqueuePresentation({ type: "ENVIRONMENT_EVENT_MODAL", eventId: event.eventId, ...ui });
+  enqueuePresentation({ type: "ENVIRONMENT_EVENT_MODAL", eventId: event.eventId, pendingEvent: event, ...event.ui });
 }
 
-export function acknowledgeEnvironmentEvent() {
-  if (gameState.session.presentation?.type !== "ENVIRONMENT_EVENT_MODAL") return false;
+export function acknowledgeEnvironmentEvent(expected = gameState.session.presentation) {
+  if (expected !== gameState.session.presentation || expected?.type !== "ENVIRONMENT_EVENT_MODAL") return false;
+  if (!commitPendingEnvironmentEvent(gameState, expected.pendingEvent)) return false;
   gameState.session.presentation = null;
   return advancePresentation();
 }
@@ -132,7 +133,7 @@ export function acknowledgeResourceWarning() {
 }
 
 export function triggerEnvironmentEvent(randomFn = Math.random) {
-  if (gameState.session.endReason) return false;
+  if (isInteractionLocked(gameState)) return false;
   const event = triggerEvent(gameState, randomFn);
   presentEvent(event);
   render(gameState);
@@ -141,8 +142,19 @@ export function triggerEnvironmentEvent(randomFn = Math.random) {
 
 function completeStallAction(stall, activity, randomFn) {
   consumeStallLife(stall);
-  moveInfluencer(gameState, randomFn);
-  const event = checkEnvironmentEvent(gameState, randomFn);
+  let event = null;
+  if (gameState.progress.actionCount >= gameState.progress.nextEventAt) {
+    // Preserve the existing movement-before-event draw order, but stage all
+    // environment changes until acknowledgement (including the movement).
+    const projectedState = { ...gameState, environment: { ...gameState.environment }, session: { ...gameState.session } };
+    moveInfluencer(projectedState, randomFn);
+    event = checkEnvironmentEvent(projectedState, randomFn);
+    const projectedEnvironment = { ...projectedState.environment, ...event.projected };
+    event.projected = Object.fromEntries(Object.entries(projectedEnvironment).filter(([key, value]) => value !== gameState.environment[key]));
+    gameState.session.pendingEnvironmentEvent = event;
+  } else {
+    moveInfluencer(gameState, randomFn);
+  }
   showActivityResultPresentation(stall, activity);
   presentEvent(event);
   if (activity.resourceWarning) enqueuePresentation(activity.resourceWarning);

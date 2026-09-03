@@ -60,6 +60,7 @@ export function changeScene(gameState, scene) {
   if (scene === SCENES.HOME || scene === SCENES.RESULT) {
     gameState.session.presentation = null;
     gameState.session.presentationQueue = [];
+    gameState.session.pendingEnvironmentEvent = null;
     if (scene === SCENES.HOME) gameState.session.endReason = null;
   }
   gameState.session.scene = scene;
@@ -120,8 +121,7 @@ function renderEnvironmentStage(gameState) {
   const presentation = gameState.session.presentation;
   const view = getEnvironmentStageView(gameState.environment);
   const showingResult = presentation?.type === "ACTIVITY_RESULT";
-  const showingEvent = presentation?.type === "ENVIRONMENT_EVENT_MODAL";
-  stage.dataset.presentation = showingResult ? "activity-result" : showingEvent ? "environment-event" : "environment";
+  stage.dataset.presentation = showingResult ? "activity-result" : "environment";
   stage.dataset.environmentStage = view.code;
   stage.dataset.raining = String(view.raining);
   stage.dataset.mosquito = String(view.mosquito);
@@ -130,8 +130,8 @@ function renderEnvironmentStage(gameState) {
   const kicker = stage.querySelector("[data-stage-kicker]");
   const message = stage.querySelector("[data-environment-message]");
   const result = stage.querySelector("[data-activity-result]");
-  if (kicker) kicker.textContent = showingResult ? "挑戰結果" : showingEvent ? "夜市新鮮事" : "今晚的夜市";
-  if (message) message.textContent = showingResult || showingEvent ? presentation.title : view.message;
+  if (kicker) kicker.textContent = showingResult ? "挑戰結果" : "今晚的夜市";
+  if (message) message.textContent = showingResult ? presentation.title : view.message;
   if (result) {
     result.hidden = !showingResult;
     if (showingResult) result.textContent = [["❤️", presentation.staminaDelta], ["⭐", presentation.scoreDelta], ["💰", presentation.moneyDelta]]

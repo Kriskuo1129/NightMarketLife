@@ -40,9 +40,9 @@ const EVENT_TITLES = {
   PRICE_UP: "食物漲價了！", PRICE_DOWN: "食物降價了！",
   REWARD_UP: "遊戲獎勵提高！", REWARD_DOWN: "遊戲獎勵降低！"
 };
-// Snapshot presentation data immediately after the event, never mutate gameplay here.
+// Build notification copy from the projected change, without applying it.
 export function getEnvironmentEventUI(event, state) {
-  const env = state.environment;
+  const env = { ...state.environment, ...event.projected };
   const blocked = state.stalls.find(stall => stall.id === env.influencerBlockedStallId);
   const effects = {
     RAIN_START: `遊戲攤體力需求增加 ${CONFIG.rainGameStaminaPenalty}`,
@@ -83,8 +83,9 @@ export function pickInfluencerTarget(stalls, currentId, randomFn = Math.random) 
 export function moveInfluencer(state, randomFn = Math.random) {
   if (state.environment.influencer) state.environment.influencerBlockedStallId = pickInfluencerTarget(state.stalls, state.environment.influencerBlockedStallId, randomFn);
 }
-export function applyEnvironmentEvent(state, eventId, randomFn = Math.random) {
-  const env = state.environment;
+export function prepareEnvironmentEvent(state, eventId, randomFn = Math.random) {
+  if (state.session.pendingEnvironmentEvent) return state.session.pendingEnvironmentEvent;
+  const env = { ...state.environment };
   if (eventId === "INFLUENCER_LEAVE") {
     if (!env.influencer) return null;
   } else if (!getEligibleEnvironmentEvents(env).includes(eventId)) return null;
@@ -106,17 +107,27 @@ export function applyEnvironmentEvent(state, eventId, randomFn = Math.random) {
     details.delta = env[key] - before;
     details.level = env[key];
   }
-  const event = { eventId, actionCount: state.progress.actionCount, details };
+  const projected = Object.fromEntries(Object.entries(env).filter(([key, value]) => value !== state.environment[key]));
+  const event = { eventId, actionCount: state.progress.actionCount, details, projected };
+  event.ui = getEnvironmentEventUI(event, state);
+  state.session.pendingEnvironmentEvent = event;
+  return event;
+}
+export function commitPendingEnvironmentEvent(state, expected = state.session.pendingEnvironmentEvent, randomFn = Math.random) {
+  if (!expected || expected !== state.session.pendingEnvironmentEvent) return null;
+  Object.assign(state.environment, expected.projected);
+  const event = { eventId: expected.eventId, actionCount: expected.actionCount, details: { ...expected.details } };
   state.statistics.eventHistory.push(event);
+  state.progress.nextEventAt = state.progress.actionCount + getNextEventInterval(randomFn);
+  state.session.pendingEnvironmentEvent = null;
   return event;
 }
 export function triggerEnvironmentEvent(state, randomFn = Math.random) {
+  if (state.session.pendingEnvironmentEvent) return state.session.pendingEnvironmentEvent;
   // A departure consumes this event slot; otherwise draw one normal event.
   const eventId = state.environment.influencer && randomFn() < CONFIG.influencerLeaveChance
     ? "INFLUENCER_LEAVE" : pickEnvironmentEvent(state, randomFn);
-  const event = applyEnvironmentEvent(state, eventId, randomFn);
-  state.progress.nextEventAt = state.progress.actionCount + getNextEventInterval(randomFn);
-  return event;
+  return prepareEnvironmentEvent(state, eventId, randomFn);
 }
 export function checkEnvironmentEvent(state, randomFn = Math.random) {
   return state.progress.actionCount >= state.progress.nextEventAt ? triggerEnvironmentEvent(state, randomFn) : null;

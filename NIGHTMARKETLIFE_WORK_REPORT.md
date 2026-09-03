@@ -883,3 +883,41 @@ HOME／New Game 清 Presentation Queue、Pending 通知與 Timer，render 關閉
 320×844、390×844、390×900、430×932 均檢查Event與Resource Modal：無水平Overflow、無Body Gameplay Scroll、按鈕可見可操作，Resource通知時只存在一個open dialog。長文字沿用換行與安全垂直捲動樣式。Money／雙歸零排列由核心測試驗證，未宣稱全部文案都獨立完成瀏覽器實測。
 
 本次只修正指定三項Revision，未新增其他功能或Luck。完成後檢查git status／git diff，不Commit、不Push，等待確認。
+
+---
+
+## Environment Event Transaction Revision：Prepare / Notify / Commit
+
+### 舊問題根因與正式順序
+
+舊版 `checkEnvironmentEvent()` 在 Action 完成時便直接套用 Environment、寫 History、更新 Threshold；Modal 只是事後通知。此外 Stage 在 Modal 期間使用事件標題，造成世界比通知更早改變。本次改為 Successful Action → Activity Result → Event Modal → 玩家「知道了」→ Commit → Resource Warning（若有）→ Gameplay。沒有新增 Environment Stage Timer，也沒有改動一般 Activity Result 的 non-blocking 規則。
+
+### Pending Schema / Prepare / Projected State
+
+`session.pendingEnvironmentEvent` 為 `null` 或 `{ eventId, actionCount, details, projected, ui }`。`details` 保留既有 delta／level／targetStallId；`projected` 只保存本次應提交的 Environment 欄位；`ui` 保存固定的 title、description、effectLines。`prepareEnvironmentEvent()` 在副本上檢查 eligibility、決定事件／level delta／Influencer target，產生 UI 後保存 Pending；正式 Environment、History、nextEventAt 均不變。
+
+Pending 存在時 Trigger 不再次抽選；Render／Resize 不抽事件。`getEnvironmentEventUI()` 以 Current Environment 加上 Pending projected 計算文案，例如 PRICE_UP 可顯示 projected ×1.2，正式 priceLevel 仍維持 1。沒有新增 LocalStorage 欄位。
+
+### Commit / History / nextEventAt
+
+`acknowledgeEnvironmentEvent()` 驗證目前 Modal identity，透過唯一的 `commitPendingEnvironmentEvent()` 套用 projected change。Commit 才寫入既有 `{ eventId, actionCount, details }` History，才抽取 `current actionCount + random 4～6` 的 nextEventAt，然後清 Pending、關閉 Event Modal、Render 並推進下一個通知。同一 Pending identity 只能提交一次；重複確認或舊 callback 不會再次寫 History。
+
+### Animation Stage / Influencer Timing
+
+Event Modal 開啟時 Stage 的文字、雨勢、蚊子及其他效果只讀正式 Environment，不使用事件標題或 Projected Environment。確認後才呈現新世界狀態。Influencer Start／Leave 的封鎖變化也只在 Commit 生效。為避免事件 Action 上既有 Influencer 移動提前改變卡片，該次移動先在 Environment 副本計算並合併進 Pending；保留原本「移動 → 離開判定／抽事件」的抽選順序與機率。沒有觸發事件的一般 Action 仍沿用原移動行為。
+
+### Interaction Lock / Resource Ordering / Cleanup
+
+Pending 本身加入 `isInteractionLocked()`，阻擋新的成功 Action 及重複 Debug Trigger。Activity Result 結束後一個 advance 即打開 Event Modal，沒有額外等待 Timer。Resource Zero Warning 仍在 Action 結果套用時決定並保存於 Queue；Event Commit 後才顯示同一個 Warning，不重新計算、不遺失、不自動進 RESULT。
+
+HOME／New Game 清 Pending、Presentation Queue 與 Modal；正常場景入口清 Timer，Timer 與 acknowledgement 的 identity guard 防止 stale callback 提交舊事件。核心測試也覆蓋直接 HOME 場景清理後舊 callback 無作用。
+
+### Core Tests
+
+完整 `tests/core.test.mjs` PASS。新增所有 Start／Stop 與 Level UP／DOWN 的 Prepare 前後隔離、projected UI、Influencer target／Leave、事件 Action 的移動延後、History 單次提交、nextEventAt 延後、Pending 禁止重抽、重複 Render 穩定、Event → Resource 同一 Warning、雨天費用只在確認後生效、New Game／HOME 清理與 stale confirm。保留 Food、Entry、Life／Closed、Rain／Mosquito、Reward／Price、Avatar、Legacy、Storage 等既有回歸驗證。
+
+### Browser / Responsive Result
+
+新增 `tests/environment-flow.browser.cjs`，使用本機伺服器與 Playwright 驅動 Edge headless（獨立測試 context，非真實手機硬體）。實際確認九種事件：Rain Start／Stop、Mosquito Start／Stop、Price Up、Reward Up、Crowd Up、Influencer Start／Leave。Modal 前正式 State 不變、Render 不重抽，點擊「知道了」後才修改；Rain Stage 文字與效果、Food Card 的網紅封鎖同步符合 Commit 時機。另等待真實 2.4 秒 Timer，確認 Activity → Event → Resource 的順序；New Game 關閉 Pending Modal。Console Error 0。
+
+320×844、390×844、390×900、430×932 的 Event Modal 均完整位於 Viewport 內，無水平 Overflow／整頁 Gameplay Scroll；已檢視 320px 截圖。Browser suite 與 Core suite 最終皆 PASS。未修改 Layout、Gameplay 數值或其他 Step；未 Commit、未 Push。

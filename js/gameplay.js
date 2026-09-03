@@ -44,7 +44,7 @@ export function getResourceZeroWarning(before, after) {
 
 export function isInteractionLocked(state) {
   const session = state.session;
-  return Boolean(session.endReason ||
+  return Boolean(session.endReason || session.pendingEnvironmentEvent ||
     [session.presentation, ...session.presentationQueue].some(item =>
       ["ENVIRONMENT_EVENT_MODAL", "RESOURCE_WARNING_MODAL"].includes(item?.type)));
 }
