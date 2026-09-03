@@ -7,7 +7,8 @@ import { applyBuildToPlayer } from "./character.js";
 import { changeClothes, changeFace, setCustomAppearance } from "./character-setup.js";
 import { processCustomClothesImage, processCustomFaceImage } from "./uploads.js";
 import { DEFAULT_CLOTHES, FACE_ASSETS, SHOP_CLOTHES } from "../assets/character-assets.js";
-import { applyRewardModifier, checkEnvironmentEvent, EVENT_MESSAGES, getEnvironmentEventUI, getEffectiveFoodPrice, getEffectiveGameStaminaCost, moveInfluencer, triggerEnvironmentEvent as triggerEvent } from "./events.js";
+import { END_MESSAGES, getExhaustionReason, getStallActivity, isInteractionLocked, predictStallAction, projectResources } from "./gameplay.js";
+import { checkEnvironmentEvent, EVENT_MESSAGES, getEnvironmentEventUI, getEffectiveFoodPrice, getEffectiveGameStaminaCost, moveInfluencer, triggerEnvironmentEvent as triggerEvent } from "./events.js";
 
 export function normalizeActivityResult(result = {}) {
   return {
@@ -20,7 +21,8 @@ export function normalizeActivityResult(result = {}) {
   };
 }
 
-export function applyActivityResult(result, { mosquito = false } = {}) {
+export function applyActivityResult(result, { mosquito = false, deferEnding = false } = {}) {
+  if (isInteractionLocked(gameState)) return false;
   const activity = normalizeActivityResult(result);
   if (![activity.staminaDelta, activity.moneyDelta, activity.scoreDelta, activity.progressCost].every(Number.isFinite)) {
     throw new TypeError("ActivityResult numeric fields must be finite numbers.");
@@ -28,16 +30,15 @@ export function applyActivityResult(result, { mosquito = false } = {}) {
   if (!activity.completed) return activity;
   const player = gameState.player;
   const before = { stamina: player.stamina, money: player.money, score: player.score };
-  player.stamina = Math.min(player.maxStamina, Math.max(0, player.stamina + activity.staminaDelta));
+  Object.assign(player, projectResources(player, activity, mosquito));
   if (mosquito) {
-    player.stamina = Math.max(0, player.stamina - CONFIG.mosquitoStaminaPenalty);
     gameState.statistics.mosquitoActions += 1;
   }
-  player.money += activity.moneyDelta;
-  player.score += activity.scoreDelta;
   gameState.progress.actionCount += activity.progressCost;
   gameState.statistics.totalActions += activity.progressCost;
   gameState.session.lastActivitySourceId = activity.sourceId || null;
+  gameState.session.exhaustionPending = Boolean(getExhaustionReason(player));
+  if (gameState.session.exhaustionPending && !deferEnding) enqueuePresentation({ type: "EXHAUSTION_CHECK" });
   render(gameState);
   return { ...activity, appliedDeltas: {
     staminaDelta: player.stamina - before.stamina,
@@ -61,6 +62,7 @@ export function clearActivityResultPresentation(presentation = gameState.session
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   gameState.session.presentation = null;
   gameState.session.presentationQueue = [];
+  gameState.session.exhaustionPending = false;
   activityPresentationTimer = null;
   render(gameState);
   return true;
@@ -85,12 +87,20 @@ function enqueuePresentation(presentation) {
 
 export function advancePresentation(expected = gameState.session.presentation) {
   if (expected !== gameState.session.presentation) return false;
-  if (expected?.type === "ENVIRONMENT_EVENT_MODAL") return false;
+  if (["ENVIRONMENT_EVENT_MODAL", "END_REASON_MODAL"].includes(expected?.type)) return false;
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
-  const presentation = gameState.session.presentationQueue.shift() ?? null;
+  let presentation = gameState.session.presentationQueue.shift() ?? null;
+  if (presentation?.type === "EXHAUSTION_CHECK") {
+    const reason = getExhaustionReason(gameState.player);
+    gameState.session.exhaustionPending = false;
+    gameState.session.presentation = null;
+    activityPresentationTimer = null;
+    if (reason) return requestEndGame(reason);
+    presentation = null;
+  }
   gameState.session.presentation = presentation;
   activityPresentationTimer = null;
-  if (presentation && presentation.type !== "ENVIRONMENT_EVENT_MODAL") {
+  if (presentation && !["ENVIRONMENT_EVENT_MODAL", "END_REASON_MODAL"].includes(presentation.type)) {
     activityPresentationTimer = setTimeout(() => advancePresentation(presentation), ACTIVITY_PRESENTATION_DURATION);
     activityPresentationTimer?.unref?.();
   }
@@ -111,7 +121,26 @@ export function acknowledgeEnvironmentEvent() {
   return advancePresentation();
 }
 
+export function requestEndGame(reason) {
+  if (gameState.session.endReason || (reason !== "HOME" && !END_MESSAGES[reason])) return false;
+  if (reason === "HOME" && isInteractionLocked(gameState)) return false;
+  gameState.session.endReason = reason;
+  if (reason === "HOME") changeScene(gameState, SCENES.RESULT);
+  else {
+    gameState.session.presentation = { type: "END_REASON_MODAL", reason, ...END_MESSAGES[reason] };
+    render(gameState);
+  }
+  return true;
+}
+
+export function acknowledgeEndGame() {
+  if (gameState.session.presentation?.type !== "END_REASON_MODAL") return false;
+  changeScene(gameState, SCENES.RESULT);
+  return true;
+}
+
 export function triggerEnvironmentEvent(randomFn = Math.random) {
+  if (gameState.session.endReason || gameState.session.exhaustionPending) return false;
   const event = triggerEvent(gameState, randomFn);
   presentEvent(event);
   render(gameState);
@@ -124,18 +153,19 @@ function completeStallAction(stall, activity, randomFn) {
   const event = checkEnvironmentEvent(gameState, randomFn);
   showActivityResultPresentation(stall, activity);
   presentEvent(event);
+  if (gameState.session.exhaustionPending) enqueuePresentation({ type: "EXHAUSTION_CHECK" });
   render(gameState);
 }
 
 export function playTestGame(stallId, randomFn = Math.random) {
-  if (gameState.session.presentation?.type === "ENVIRONMENT_EVENT_MODAL") return false;
+  if (isInteractionLocked(gameState)) return false;
   const stall = gameState.stalls.find((item) => item.id === stallId);
   const result = TEST_GAME_RESULTS[stallId];
   if (!stall || stall.type !== STALL_TYPES.GAME || !result) return false;
   const failure = getStallEntryFailure(stall);
   if (failure) { showEntryFailure(failure); return false; }
   const environment = gameState.environment;
-  const activity = applyActivityResult(applyRewardModifier({ ...result, staminaDelta: -getEffectiveGameStaminaCost(stall, environment) }, environment), { mosquito: environment.mosquito });
+  const activity = applyActivityResult(getStallActivity(stall, environment), { mosquito: environment.mosquito, deferEnding: true });
   gameState.statistics.gamePlays[stall.id] = (gameState.statistics.gamePlays[stall.id] ?? 0) + 1;
   gameState.statistics.stallVisits[stall.id] = (gameState.statistics.stallVisits[stall.id] ?? 0) + 1;
   completeStallAction(stall, activity, randomFn);
@@ -166,12 +196,12 @@ function showEntryFailure(failure) {
 }
 
 export function buyFood(stallId, randomFn = Math.random) {
-  if (gameState.session.presentation?.type === "ENVIRONMENT_EVENT_MODAL") return false;
+  if (isInteractionLocked(gameState)) return false;
   const stall = gameState.stalls.find((item) => item.id === stallId);
   if (!stall || stall.type !== STALL_TYPES.FOOD || !FOOD_CONFIG[stallId]) return false;
   const failure = getStallEntryFailure(stall);
   if (failure) { showEntryFailure(failure); return false; }
-  const activity = applyActivityResult({ staminaDelta: stall.staminaRecovery, moneyDelta: -getEffectiveFoodPrice(stall, gameState.environment), scoreDelta: 0, completed: true, progressCost: 1, sourceId: stall.id }, { mosquito: gameState.environment.mosquito });
+  const activity = applyActivityResult(getStallActivity(stall, gameState.environment), { mosquito: gameState.environment.mosquito, deferEnding: true });
   gameState.statistics.foodPurchases += 1;
   gameState.statistics.stallVisits[stall.id] = (gameState.statistics.stallVisits[stall.id] ?? 0) + 1;
   completeStallAction(stall, activity, randomFn);
@@ -216,6 +246,7 @@ function setAvatarStatus(message = "") {
 
 function bindUI() {
   document.querySelector("#environment-event-dialog")?.addEventListener("cancel", event => event.preventDefault());
+  document.querySelector("#end-reason-dialog")?.addEventListener("cancel", event => event.preventDefault());
   document.addEventListener("submit", (event) => {
     if (event.target.id !== "home-form") return;
     event.preventDefault();
@@ -226,7 +257,8 @@ function bindUI() {
     const button = event.target.closest("button");
     if (!button) return;
     if (button.dataset.action === "acknowledge-event") { acknowledgeEnvironmentEvent(); return; }
-    if (gameState.session.presentation?.type === "ENVIRONMENT_EVENT_MODAL") return;
+    if (button.dataset.action === "acknowledge-end") { acknowledgeEndGame(); return; }
+    if (isInteractionLocked(gameState) && gameState.session.scene === SCENES.NIGHT_MARKET) return;
     if (button.dataset.action === "show-pro") document.querySelector("#pro-dialog")?.showModal();
     if (button.dataset.action === "open-build") {
       renderBuildOptions(gameState);
@@ -248,7 +280,7 @@ function bindUI() {
     }
     if (button.dataset.action === "enter-stall") enterSelectedStall();
     if (button.dataset.action === "go-home") document.querySelector("#home-dialog")?.showModal();
-    if (button.dataset.action === "confirm-home") { button.closest("dialog")?.close(); changeScene(gameState, SCENES.RESULT); }
+    if (button.dataset.action === "confirm-home") { button.closest("dialog")?.close(); requestEndGame("HOME"); }
     if (button.dataset.sceneTarget) changeScene(gameState, button.dataset.sceneTarget);
   });
   document.addEventListener("change", async (event) => {
@@ -282,12 +314,13 @@ function bindUI() {
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    if (gameState.session.presentation?.type === "ENVIRONMENT_EVENT_MODAL") { event.preventDefault(); return; }
+    if (isInteractionLocked(gameState) && gameState.session.scene === SCENES.NIGHT_MARKET) { event.preventDefault(); return; }
     document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
   });
 }
 
 export function selectStallAndScroll(stallId) {
+  if (isInteractionLocked(gameState)) return false;
   const selected = selectStall(gameState, stallId);
   if (selected) scrollSelectedStallIntoView();
   return selected;
@@ -313,7 +346,7 @@ export function showSelectedStallPlaceholder() {
 }
 
 export function enterSelectedStall() {
-  if (gameState.session.presentation?.type === "ENVIRONMENT_EVENT_MODAL") return false;
+  if (isInteractionLocked(gameState)) return false;
   const stall = getSelectedStall(gameState);
   const failure = getStallEntryFailure(stall);
   if (failure) { showEntryFailure(failure); return false; }
@@ -387,6 +420,7 @@ window.NMLDebug = Object.freeze({
   playTestGame,
   buyFood,
   triggerEnvironmentEvent,
+  predictStallAction: id => predictStallAction(gameState, gameState.stalls.find(stall => stall.id === id)),
   changeScene: (scene) => changeScene(gameState, scene),
   selectStall: selectStallAndScroll,
   closeStall: (id) => setStallClosed(id, true),

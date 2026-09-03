@@ -4,11 +4,13 @@ import { getAppearanceView } from "./character-setup.js";
 import { renderAllCharacters } from "./character-renderer.js";
 import { getStallDisplayStatus } from "./stalls.js";
 import { getEffectiveFoodPrice, getEffectiveGameStaminaCost } from "./events.js";
+import { isInteractionLocked, predictStallAction } from "./gameplay.js";
 
 export const SCENES = Object.freeze({ HOME: "HOME", CHARACTER_SETUP: "CHARACTER_SETUP", NIGHT_MARKET: "NIGHT_MARKET", RESULT: "RESULT" });
 
 export function render(gameState) {
   renderEnvironmentEventModal(gameState);
+  renderEndReasonModal(gameState);
   document.querySelectorAll("[data-scene]").forEach((element) => {
     element.hidden = element.dataset.scene !== gameState.session.scene;
   });
@@ -53,6 +55,8 @@ export function changeScene(gameState, scene) {
   if (scene === SCENES.HOME || scene === SCENES.RESULT) {
     gameState.session.presentation = null;
     gameState.session.presentationQueue = [];
+    gameState.session.exhaustionPending = false;
+    if (scene === SCENES.HOME) gameState.session.endReason = null;
   }
   gameState.session.scene = scene;
   render(gameState);
@@ -112,7 +116,7 @@ function renderEnvironmentStage(gameState) {
   const presentation = gameState.session.presentation;
   const view = getEnvironmentStageView(gameState.environment);
   const showingResult = presentation?.type === "ACTIVITY_RESULT";
-  const showingEvent = presentation?.type === "ENVIRONMENT_EVENT";
+  const showingEvent = ["ENVIRONMENT_EVENT", "ENVIRONMENT_EVENT_MODAL"].includes(presentation?.type);
   stage.dataset.presentation = showingResult ? "activity-result" : showingEvent ? "environment-event" : "environment";
   stage.dataset.environmentStage = view.code;
   stage.dataset.raining = String(view.raining);
@@ -177,6 +181,7 @@ export function getSelectedStall(gameState) {
 }
 
 export function selectStall(gameState, stallId) {
+  if (isInteractionLocked(gameState)) return false;
   if (!gameState.stalls.some((stall) => stall.id === stallId)) return false;
   gameState.session.selectedStallId = stallId;
   const grid = document.querySelector("[data-stall-grid]");
@@ -196,6 +201,10 @@ export function renderNightMarket(gameState) {
   const grid = document.querySelector("[data-stall-grid]");
   if (!grid) return;
   ensureStallCards(gameState, grid);
+  const locked = isInteractionLocked(gameState);
+  grid.inert = locked;
+  grid.setAttribute("aria-busy", String(locked));
+  grid.querySelectorAll("button").forEach(button => { button.disabled = locked; });
   grid.querySelectorAll("[data-stall-id]").forEach((card) => {
     const stall = gameState.stalls.find((item) => item.id === card.dataset.stallId);
     const view = getStallDisplayStatus(stall, gameState.environment);
@@ -225,8 +234,14 @@ export function renderNightMarket(gameState) {
   if (stamina) stamina.closest(".stall-entry-cost").hidden = stall.type !== "GAME";
   document.querySelectorAll("[data-food-info]").forEach((element) => { element.hidden = stall.type !== "FOOD"; });
   const enterButton = document.querySelector('#stall-detail-dialog [data-action="enter-stall"]');
+  const warning = document.querySelector("[data-entry-warning]");
+  if (warning) {
+    const prediction = predictStallAction(gameState, stall);
+    warning.textContent = prediction?.warnings.join("\n") ?? "";
+    warning.hidden = !warning.textContent || !view.canEnter;
+  }
   if (enterButton) {
-    enterButton.disabled = !view.canEnter;
+    enterButton.disabled = locked || !view.canEnter;
     enterButton.textContent = stall.type === "FOOD" ? "購買" : "前往攤位";
   }
 }
@@ -242,5 +257,18 @@ function renderEnvironmentEventModal(gameState) {
   dialog.querySelector("[data-event-title]").textContent = presentation.title;
   dialog.querySelector("[data-event-description]").textContent = presentation.description;
   dialog.querySelector("[data-event-effects]").textContent = presentation.effectLines.join("\n");
+  if (!dialog.open) dialog.showModal();
+}
+
+function renderEndReasonModal(gameState) {
+  const dialog = document.querySelector("#end-reason-dialog");
+  if (!dialog) return;
+  const presentation = gameState.session.presentation;
+  if (presentation?.type !== "END_REASON_MODAL") {
+    if (dialog.open) dialog.close();
+    return;
+  }
+  dialog.querySelector("[data-end-title]").textContent = presentation.title;
+  dialog.querySelector("[data-end-description]").textContent = presentation.description;
   if (!dialog.open) dialog.showModal();
 }

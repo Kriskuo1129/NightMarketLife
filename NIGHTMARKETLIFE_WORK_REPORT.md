@@ -797,3 +797,45 @@ New Game 重置 session queue／presentation 並清 Timer，render 關閉舊 Mod
 新增全部 12 種事件 UI Data／影響文案測試（包含實際網紅攤名、×1.2 倍率與人潮狀態）；驗證 UI Data 無 Gameplay 副作用、Rain Modal Pending／Visible、重複 render 只開一次、Modal 阻擋 Game／Food、Timer 推進不能跳過確認、後續事件不覆蓋目前通知、按鈕確認後繼續佇列、New Game 關閉通知／清空 Pending、HOME 清理及舊 callback 無效。保留 Step 1～4D 既有核心回歸測試。
 
 本次僅補 Environment Event Modal Notification，未新增 Gameplay、Luck 或其他系統。完成後只檢查 git status／git diff；不 Commit、不 Push，等待確認。
+
+## Gameplay Flow Patch：Event Timing / Resource Exhaustion / Entry Warning
+
+### Event Modal Timing 與 Interaction Lock
+
+修正根因：上一版只有目前 Presentation 為 Event Modal 時阻擋操作，事件已排隊但尚未顯示 Modal 時仍可執行 Action。現在 `isInteractionLocked()` 同時檢查目前與 Pending 的 Event Stage／Event Modal，以及 exhaustionPending／endReason。事件發生後，Activity Result、Event Stage、Event Modal 全段均鎖定 Stall／回家卡；Grid 設 inert、按鈕 disabled，選攤與 Game／Food／Enter／ActivityResult 入口也有相同 Guard。沒有新增獨立 Modal Timer。
+
+Event Modal 期間舞台維持事件 Presentation，不先退回正常環境演出。玩家確認後才推進 FIFO；多次 render 不重複 showModal，舊 Timer 保留物件 identity guard。Debug 正式事件仍走同一 Queue，結束已 Pending 時不再插入新 Debug 事件。
+
+### Resource Exhaustion 與 End Reason
+
+新增 session.exhaustionPending／endReason。完成的 ActivityResult 套用後，stamina、money 最低 Clamp 0；使用 <=0 判定。資源歸零立即鎖定，不能再行動，但保留最後一次行動與事件演出。
+
+STAMINA_EXHAUSTED 優先於 MONEY_EXHAUSTED，兩者同時歸零只顯示一次。結束原因分別為「眼前一黑」與「口袋比臉還乾淨」，採指定描述與原生 Modal；無 Timeout，Escape 不可跳過，按「回家」才進既有 RESULT。`requestEndGame(reason)` 共用 HOME／Resource Ending 入口，HOME 保留既有回家確認，未重做 Settlement。
+
+### Event + End Ordering
+
+正式攤位成功 Action：Activity Result → Event Stage（若有）→ Event Modal（若有）→ EXHAUSTION_CHECK → End Reason Modal（若有）→ 玩家確認 → RESULT。Exhaustion Pending 先鎖操作，真正結束原因在事件確認後依 Applied GameState 判定，事件 History 不會被結束流程吞掉。未完成 ActivityResult 與 Entry Validation Failure 不啟動結束流程。
+
+New Game 清 Timer 並重置 Session；HOME 清 queue、兩種 Modal、exhaustionPending、endReason 與 Lock。RESULT 保留 endReason，回首頁後清除。Presentation／Ending 資料不存 LocalStorage。
+
+### Entry Prediction 與共用計算
+
+新增 `js/gameplay.js`，提供 `getStallActivity()`／`projectResources()`，正式 Apply 與 `predictStallAction()` 共用計算。Game 使用 Effective Rain Cost 與 Reward Multiplier；Mosquito 於 Base／Recovery Clamp 後扣除。Food 使用有效價格、Recovery Clamp、Mosquito 的真正順序，避免高體力恢復溢出造成預測分叉。未新增 Game Money Entry Cost。
+
+既有 Entry Modal 內新增暖橘 Warning，支援同時顯示體力／金錢兩條提示。Warning 只是預測，不阻止剛好支付成本的 Action；小於成本仍由既有 Entry Validation 拒絕。Debug 補充唯讀 `predictStallAction(stallId)`，沒有大型 Debug UI。
+
+### Tests
+
+完整核心測試：**NightMarketLife core tests: PASS**。
+
+新增驗證：體力 10／正常 Cost 10、雨天 15／Cost 15、蚊子 15→0 與 16→1；Food 1+15−5=11、95+15 Clamp100−5=95；Price ×1.2 下 money119拒絕／120允許且結束／121不警告；負值 Clamp、completed=false 零副作用、同時歸零體力优先且只有一次 Modal；事件從 Activity Result 起就禁止插入 Game／Food／選攤／回家；Event Modal 確認後才執行 Exhaustion Check；End Modal 必須確認、RESULT／HOME／新局清理、舊 callback 無效。
+
+既有 Step 1～4D 與 Modal 回歸測試保留。兩處舊測試原本在歸零後同局繼續驗證其他規則，改為新局隔離，符合本次新增的結束規則。
+
+### Responsive / Browser
+
+實際 HOME→NIGHT_MARKET 自然遊玩，觀察到事件發生後 Activity Result 時所有 Stall 即 disabled；Event Stage／Event Modal 全程保持鎖定。實際事件抽樣為 PRICE_DOWN、REWARD_DOWN。另驗證體力10 Entry Warning（仍可進場）→成功歸零→「眼前一黑」→按回家→既有 RESULT→回首頁→新局，HUD 與操作正常恢復。
+
+320×844、390×844、390×900、430×932 都檢查 Event Modal、Entry Warning、End Modal：無水平 Overflow、Modal 在螢幕範圍內，Warning／End 按鈕可見可操作。End Modal 符合原生 :modal，背景 Stall 全部 disabled；CSS 支援長文字換行與超高內容垂直 Scroll。金錢結束與 Event+End 的精確數值／順序由固定核心測試驗證，未宣稱所有隨機排列均做瀏覽器實測。
+
+本次只完成附件指定三項 Flow Patch，沒有新增 Environment Event、Luck、正式 Settlement、其他 Gameplay 或後端。完成後檢查 git status／git diff，不 Commit、不 Push，等待確認。
