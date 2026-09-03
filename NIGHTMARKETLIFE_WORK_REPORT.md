@@ -765,3 +765,35 @@ Crowd 使用 1～5；Price 使用現有倍率陣列索引 0～3（0.9／1／1.2�
 ## 完成範圍
 
 **Step 4 Gameplay Loop 已完成。** 本輪未新增 Equipment、正式 Clothing／Management、Achievement Conditions、正式 Settlement、Opening Event、排行榜／PK、後端、新 Stall 或外部遊戲通訊。不存在的 Technical Spec 不建立；本次只更新 Work Report。保留所有先前未提交修改，完成後檢查 git status／diff，不 Commit、不 Push，等待實機確認。
+
+## Step 4D UX Patch：Environment Event Modal
+
+### Modal 架構與 Event UI Data
+
+新增原生 `#environment-event-dialog`，沿用深咖啡背景、暖色 Border、米白文字與 Primary Action。標題、描述、目前影響及「知道了」按鈕具備語意標記。showModal 阻擋背景；Escape／cancel 不關閉，沒有自動消失 Timer，必須按「知道了」確認。Game／Food／Enter 的正式入口也拒絕 Modal 期間的行動。
+
+`events.js` 的 `getEnvironmentEventUI()` 統一提供全部 12 種既有事件的 title、description、effectLines。文字在事件完成後依實際 State 產生快照：雨／蚊子讀 Config、網紅讀實際攤位名稱、Price／Reward 讀倍率陣列、人潮只顯示狀態變化，不宣稱未實作的效果。排隊期間若後續行動改變環境，通知仍描述該事件發生當下的結果。Modal 不修改 Environment、Player、Statistics、Stall 或 Event History。
+
+### Presentation 時序與 New Game 清理
+
+既有 FIFO 增加 `ENVIRONMENT_EVENT_MODAL`：Activity Result（2.4 秒）→ Event Stage（2.4 秒）→ Event Modal（等待確認）→ 下一筆 Presentation／Environment Status。Modal 沒有推進 Timer；advancePresentation 無法跳過它，只能透過 acknowledgeEnvironmentEvent 確認。多次 render 以 dialog.open 防止重複 showModal，後續事件排隊而不取代目前通知。
+
+New Game 重置 session queue／presentation 並清 Timer，render 關閉舊 Modal。正式 HOME／RESULT 切換也清 Timer 與 queue；舊 callback 的 identity guard 防止新局出現舊通知。Modal 資料僅存在 session，不保存到 LocalStorage。
+
+### Debug
+
+`NMLDebug.triggerEnvironmentEvent()` 使用與正常行動相同的 presentEvent 路徑，會排入 Stage 與 Modal；沒有 Debug-only 通知邏輯。原事件 Gameplay／History 更新仍只執行一次。
+
+### Responsive
+
+實際瀏覽器由 HOME 進入 NIGHT_MARKET，成功行動觸發網紅事件，觀察舞台後出現通知。320×844、390×844、390×900、430×932 均確認 Modal 位於畫面內、沒有水平 Overflow、「知道了」可見，且符合原生 `:modal` 狀態。Modal 使用 max-height 與 overflow-y:auto，描述及影響文字可換行；超高內容可垂直捲動。點擊確認後恢復尚未完成的 Presentation Queue。
+
+本輪實機瀏覽器採自然事件抽樣（網紅）；所有事件文案與倍率則由核心測試驗證，未宣稱每種事件皆完成獨立瀏覽器實測。
+
+### Tests
+
+完整核心測試：**NightMarketLife core tests: PASS**。
+
+新增全部 12 種事件 UI Data／影響文案測試（包含實際網紅攤名、×1.2 倍率與人潮狀態）；驗證 UI Data 無 Gameplay 副作用、Rain Modal Pending／Visible、重複 render 只開一次、Modal 阻擋 Game／Food、Timer 推進不能跳過確認、後續事件不覆蓋目前通知、按鈕確認後繼續佇列、New Game 關閉通知／清空 Pending、HOME 清理及舊 callback 無效。保留 Step 1～4D 既有核心回歸測試。
+
+本次僅補 Environment Event Modal Notification，未新增 Gameplay、Luck 或其他系統。完成後只檢查 git status／git diff；不 Commit、不 Push，等待確認。

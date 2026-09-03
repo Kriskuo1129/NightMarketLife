@@ -32,6 +32,34 @@ export const EVENT_MESSAGES = Object.freeze({
   PRICE_UP: "老闆們默契十足地一起漲價了。", PRICE_DOWN: "今晚突然開始佛心營業。",
   REWARD_UP: "今晚手氣好像有點東西。", REWARD_DOWN: "今天的運氣似乎請假了。"
 });
+const EVENT_TITLES = {
+  RAIN_START: "突然下大雨！", RAIN_STOP: "雨停了！",
+  MOSQUITO_START: "蚊子來了！", MOSQUITO_STOP: "蚊子散去了！",
+  INFLUENCER: "網紅來了！", INFLUENCER_LEAVE: "網紅離開了！",
+  CROWD_UP: "人潮增加了！", CROWD_DOWN: "人潮減少了！",
+  PRICE_UP: "食物漲價了！", PRICE_DOWN: "食物降價了！",
+  REWARD_UP: "遊戲獎勵提高！", REWARD_DOWN: "遊戲獎勵降低！"
+};
+// Snapshot presentation data immediately after the event, never mutate gameplay here.
+export function getEnvironmentEventUI(event, state) {
+  const env = state.environment;
+  const blocked = state.stalls.find(stall => stall.id === env.influencerBlockedStallId);
+  const effects = {
+    RAIN_START: `遊戲攤體力需求增加 ${CONFIG.rainGameStaminaPenalty}`,
+    RAIN_STOP: "遊戲攤體力需求恢復正常",
+    MOSQUITO_START: `每次成功行動額外消耗 ${CONFIG.mosquitoStaminaPenalty} 體力`,
+    MOSQUITO_STOP: "不再受到蚊子額外體力消耗",
+    INFLUENCER: blocked ? `🚫 ${blocked.name} 暫時無法進入` : "目前沒有可封鎖的攤位",
+    INFLUENCER_LEAVE: "網紅封鎖解除",
+    CROWD_UP: `人潮增加，目前：${CONFIG.crowdLevels[env.crowdLevel]}`,
+    CROWD_DOWN: `人潮減少，目前：${CONFIG.crowdLevels[env.crowdLevel]}`,
+    PRICE_UP: `食物價格目前為 ×${CONFIG.priceMultipliers[env.priceLevel]}`,
+    PRICE_DOWN: `食物價格目前為 ×${CONFIG.priceMultipliers[env.priceLevel]}`,
+    REWARD_UP: `遊戲獎勵目前為 ×${CONFIG.rewardMultipliers[env.rewardLevel]}`,
+    REWARD_DOWN: `遊戲獎勵目前為 ×${CONFIG.rewardMultipliers[env.rewardLevel]}`
+  };
+  return { title: EVENT_TITLES[event.eventId], description: EVENT_MESSAGES[event.eventId], effectLines: [effects[event.eventId]] };
+}
 const LEVEL_RULES = {
   CROWD: { key: "crowdLevel", min: 1, max: 5 },
   PRICE: { key: "priceLevel", min: 0, max: CONFIG.priceMultipliers.length - 1 },

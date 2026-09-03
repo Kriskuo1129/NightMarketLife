@@ -1,13 +1,13 @@
 import { CONFIG, getBuildById, LOW_STAMINA_MESSAGES, NO_MONEY_MESSAGES, pickRandomMessage } from "./config.js";
 import { gameState, resetGameState } from "./state.js";
 import { clearCharacterSettings, loadCharacterSettings, saveCharacterSettings } from "./storage.js";
-import { SCENES, changeScene, getSelectedStall, render, renderBuildOptions, scrollSelectedStallIntoView, selectStall, setStatus } from "./ui.js";
+import { SCENES, changeScene as renderScene, getSelectedStall, render, renderBuildOptions, scrollSelectedStallIntoView, selectStall, setStatus } from "./ui.js";
 import { consumeStallLife, FOOD_CONFIG, getStallDisplayStatus, STALL_CONFIG, STALL_TYPES, TEST_GAME_RESULTS } from "./stalls.js";
 import { applyBuildToPlayer } from "./character.js";
 import { changeClothes, changeFace, setCustomAppearance } from "./character-setup.js";
 import { processCustomClothesImage, processCustomFaceImage } from "./uploads.js";
 import { DEFAULT_CLOTHES, FACE_ASSETS, SHOP_CLOTHES } from "../assets/character-assets.js";
-import { applyRewardModifier, checkEnvironmentEvent, EVENT_MESSAGES, getEffectiveFoodPrice, getEffectiveGameStaminaCost, moveInfluencer, triggerEnvironmentEvent as triggerEvent } from "./events.js";
+import { applyRewardModifier, checkEnvironmentEvent, EVENT_MESSAGES, getEnvironmentEventUI, getEffectiveFoodPrice, getEffectiveGameStaminaCost, moveInfluencer, triggerEnvironmentEvent as triggerEvent } from "./events.js";
 
 export function normalizeActivityResult(result = {}) {
   return {
@@ -51,6 +51,11 @@ export const handleExternalGameResult = (result) => applyActivityResult(result);
 const ACTIVITY_PRESENTATION_DURATION = 2400;
 let activityPresentationTimer = null;
 
+function changeScene(state, scene) {
+  if (scene === SCENES.HOME || scene === SCENES.RESULT) clearActivityResultPresentation();
+  renderScene(state, scene);
+}
+
 export function clearActivityResultPresentation(presentation = gameState.session.presentation) {
   if (presentation && gameState.session.presentation !== presentation) return false;
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
@@ -80,11 +85,12 @@ function enqueuePresentation(presentation) {
 
 export function advancePresentation(expected = gameState.session.presentation) {
   if (expected !== gameState.session.presentation) return false;
+  if (expected?.type === "ENVIRONMENT_EVENT_MODAL") return false;
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   const presentation = gameState.session.presentationQueue.shift() ?? null;
   gameState.session.presentation = presentation;
   activityPresentationTimer = null;
-  if (presentation) {
+  if (presentation && presentation.type !== "ENVIRONMENT_EVENT_MODAL") {
     activityPresentationTimer = setTimeout(() => advancePresentation(presentation), ACTIVITY_PRESENTATION_DURATION);
     activityPresentationTimer?.unref?.();
   }
@@ -93,7 +99,16 @@ export function advancePresentation(expected = gameState.session.presentation) {
 }
 
 function presentEvent(event) {
-  if (event) enqueuePresentation({ type: "ENVIRONMENT_EVENT", eventId: event.eventId, title: EVENT_MESSAGES[event.eventId] });
+  if (!event) return;
+  const ui = getEnvironmentEventUI(event, gameState);
+  enqueuePresentation({ type: "ENVIRONMENT_EVENT", eventId: event.eventId, title: EVENT_MESSAGES[event.eventId] });
+  enqueuePresentation({ type: "ENVIRONMENT_EVENT_MODAL", eventId: event.eventId, ...ui });
+}
+
+export function acknowledgeEnvironmentEvent() {
+  if (gameState.session.presentation?.type !== "ENVIRONMENT_EVENT_MODAL") return false;
+  gameState.session.presentation = null;
+  return advancePresentation();
 }
 
 export function triggerEnvironmentEvent(randomFn = Math.random) {
@@ -113,6 +128,7 @@ function completeStallAction(stall, activity, randomFn) {
 }
 
 export function playTestGame(stallId, randomFn = Math.random) {
+  if (gameState.session.presentation?.type === "ENVIRONMENT_EVENT_MODAL") return false;
   const stall = gameState.stalls.find((item) => item.id === stallId);
   const result = TEST_GAME_RESULTS[stallId];
   if (!stall || stall.type !== STALL_TYPES.GAME || !result) return false;
@@ -150,6 +166,7 @@ function showEntryFailure(failure) {
 }
 
 export function buyFood(stallId, randomFn = Math.random) {
+  if (gameState.session.presentation?.type === "ENVIRONMENT_EVENT_MODAL") return false;
   const stall = gameState.stalls.find((item) => item.id === stallId);
   if (!stall || stall.type !== STALL_TYPES.FOOD || !FOOD_CONFIG[stallId]) return false;
   const failure = getStallEntryFailure(stall);
@@ -198,6 +215,7 @@ function setAvatarStatus(message = "") {
 }
 
 function bindUI() {
+  document.querySelector("#environment-event-dialog")?.addEventListener("cancel", event => event.preventDefault());
   document.addEventListener("submit", (event) => {
     if (event.target.id !== "home-form") return;
     event.preventDefault();
@@ -207,6 +225,8 @@ function bindUI() {
   document.addEventListener("click", (event) => {
     const button = event.target.closest("button");
     if (!button) return;
+    if (button.dataset.action === "acknowledge-event") { acknowledgeEnvironmentEvent(); return; }
+    if (gameState.session.presentation?.type === "ENVIRONMENT_EVENT_MODAL") return;
     if (button.dataset.action === "show-pro") document.querySelector("#pro-dialog")?.showModal();
     if (button.dataset.action === "open-build") {
       renderBuildOptions(gameState);
@@ -262,6 +282,7 @@ function bindUI() {
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
+    if (gameState.session.presentation?.type === "ENVIRONMENT_EVENT_MODAL") { event.preventDefault(); return; }
     document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
   });
 }
@@ -292,6 +313,7 @@ export function showSelectedStallPlaceholder() {
 }
 
 export function enterSelectedStall() {
+  if (gameState.session.presentation?.type === "ENVIRONMENT_EVENT_MODAL") return false;
   const stall = getSelectedStall(gameState);
   const failure = getStallEntryFailure(stall);
   if (failure) { showEntryFailure(failure); return false; }

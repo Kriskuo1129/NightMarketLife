@@ -8,6 +8,7 @@ import { getEffectiveFoodPrice, getEffectiveGameStaminaCost } from "./events.js"
 export const SCENES = Object.freeze({ HOME: "HOME", CHARACTER_SETUP: "CHARACTER_SETUP", NIGHT_MARKET: "NIGHT_MARKET", RESULT: "RESULT" });
 
 export function render(gameState) {
+  renderEnvironmentEventModal(gameState);
   document.querySelectorAll("[data-scene]").forEach((element) => {
     element.hidden = element.dataset.scene !== gameState.session.scene;
   });
@@ -49,6 +50,10 @@ export function render(gameState) {
 
 export function changeScene(gameState, scene) {
   if (!Object.hasOwn(SCENES, scene)) throw new Error(`Unknown scene: ${scene}`);
+  if (scene === SCENES.HOME || scene === SCENES.RESULT) {
+    gameState.session.presentation = null;
+    gameState.session.presentationQueue = [];
+  }
   gameState.session.scene = scene;
   render(gameState);
 }
@@ -224,4 +229,18 @@ export function renderNightMarket(gameState) {
     enterButton.disabled = !view.canEnter;
     enterButton.textContent = stall.type === "FOOD" ? "購買" : "前往攤位";
   }
+}
+
+function renderEnvironmentEventModal(gameState) {
+  const dialog = document.querySelector("#environment-event-dialog");
+  if (!dialog) return;
+  const presentation = gameState.session.presentation;
+  if (presentation?.type !== "ENVIRONMENT_EVENT_MODAL") {
+    if (dialog.open) dialog.close();
+    return;
+  }
+  dialog.querySelector("[data-event-title]").textContent = presentation.title;
+  dialog.querySelector("[data-event-description]").textContent = presentation.description;
+  dialog.querySelector("[data-event-effects]").textContent = presentation.effectLines.join("\n");
+  if (!dialog.open) dialog.showModal();
 }

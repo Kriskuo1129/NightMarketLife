@@ -336,7 +336,7 @@ clearActivityResultPresentation();
 // Step 4D deterministic lifecycle, modifiers and presentation sequencing.
 const { createGameState, createProgress } = await import("../js/state.js");
 const { getNextEventInterval, getEligibleEnvironmentEvents, pickEnvironmentEvent, pickLevelDelta, applyEnvironmentEvent, triggerEnvironmentEvent: triggerStateEvent, checkEnvironmentEvent, pickInfluencerTarget, moveInfluencer, getEffectiveGameStaminaCost, getEffectiveFoodPrice, applyRewardModifier } = await import("../js/events.js");
-const { advancePresentation, triggerEnvironmentEvent: debugTriggerEvent } = await import("../js/game.js");
+const { advancePresentation, acknowledgeEnvironmentEvent, triggerEnvironmentEvent: debugTriggerEvent } = await import("../js/game.js");
 assert.equal(getNextEventInterval(() => 0), 4);
 assert.equal(getNextEventInterval(() => .5), 5);
 assert.equal(getNextEventInterval(() => .999), 6);
@@ -467,11 +467,14 @@ assert.equal(firstActual.appliedDeltas.staminaDelta, -10); // event affects next
 assert.equal(gameState.environment.raining, true);
 assert.equal(gameState.progress.nextEventAt, 5);
 assert.equal(gameState.session.presentation.type, "ACTIVITY_RESULT");
-assert.equal(gameState.session.presentationQueue.length, 1);
+assert.equal(gameState.session.presentationQueue.length, 2);
 assert.equal(gameState.session.presentationQueue[0].type, "ENVIRONMENT_EVENT");
 advancePresentation();
 assert.equal(gameState.session.presentation.eventId, "RAIN_START");
 advancePresentation();
+assert.equal(gameState.session.presentation.type, "ENVIRONMENT_EVENT_MODAL");
+assert.equal(advancePresentation(), false);
+acknowledgeEnvironmentEvent();
 assert.equal(gameState.session.presentation, null);
 assert.equal(gameState.environment.raining, true);
 debugTriggerEvent(() => 0);
@@ -491,4 +494,72 @@ assert.equal(moveRandomCalls, 1);
 assert.equal(gameState.environment.influencerBlockedStallId, "game_02");
 assert.equal(gameState.statistics.eventHistory.length, 0);
 clearActivityResultPresentation();
+// Step 4D UX patch: all event UI data, modal lifecycle and render idempotence.
+const { getEnvironmentEventUI, EVENT_MESSAGES } = await import("../js/events.js");
+const { render, changeScene } = await import("../js/ui.js");
+const modalState = createGameState();
+modalState.environment.priceLevel = 2;
+modalState.environment.rewardLevel = 2;
+modalState.environment.crowdLevel = 4;
+modalState.environment.influencerBlockedStallId = "game_02";
+const expectedEffects = {
+  RAIN_START: "遊戲攤體力需求增加 5", RAIN_STOP: "遊戲攤體力需求恢復正常",
+  MOSQUITO_START: "每次成功行動額外消耗 5 體力", MOSQUITO_STOP: "不再受到蚊子額外體力消耗",
+  INFLUENCER: "🚫 測試遊戲攤 B 暫時無法進入", INFLUENCER_LEAVE: "網紅封鎖解除",
+  CROWD_UP: "人潮增加，目前：熱鬧", CROWD_DOWN: "人潮減少，目前：熱鬧",
+  PRICE_UP: "食物價格目前為 ×1.2", PRICE_DOWN: "食物價格目前為 ×1.2",
+  REWARD_UP: "遊戲獎勵目前為 ×1.2", REWARD_DOWN: "遊戲獎勵目前為 ×1.2"
+};
+for (const eventId of Object.keys(EVENT_MESSAGES)) {
+  const before = JSON.stringify(modalState);
+  const data = getEnvironmentEventUI({ eventId }, modalState);
+  assert.ok(data.title && data.description);
+  assert.deepEqual(data.effectLines, [expectedEffects[eventId]]);
+  assert.equal(JSON.stringify(modalState), before);
+}
+const originalQuery = document.querySelector;
+let modalOpens = 0;
+const modalFields = {};
+const fakeModal = {
+  open: false,
+  showModal() { this.open = true; modalOpens += 1; },
+  close() { this.open = false; },
+  querySelector(selector) { return modalFields[selector] ??= { textContent: "" }; }
+};
+document.querySelector = selector => selector === "#environment-event-dialog" ? fakeModal : null;
+createNewGame();
+debugTriggerEvent(() => 0);
+const pendingModal = gameState.session.presentationQueue[0];
+assert.equal(pendingModal.type, "ENVIRONMENT_EVENT_MODAL");
+assert.equal(pendingModal.title, "突然下大雨！");
+advancePresentation();
+const modalSnapshot = snapshot();
+render(gameState); render(gameState);
+assert.equal(modalOpens, 1);
+assert.equal(fakeModal.open, true);
+assert.equal(advancePresentation(), false);
+assert.equal(playTestGame("game_01"), false);
+assert.equal(buyFood("food_01"), false);
+assert.equal(snapshot(), modalSnapshot);
+debugTriggerEvent(() => 0); // next event queues without replacing current modal
+assert.equal(gameState.session.presentation, pendingModal);
+assert.equal(acknowledgeEnvironmentEvent(), true);
+assert.equal(fakeModal.open, false);
+assert.equal(gameState.session.presentation.eventId, "RAIN_STOP");
+advancePresentation();
+assert.equal(modalOpens, 2);
+const oldModal = gameState.session.presentation;
+createNewGame();
+assert.equal(fakeModal.open, false);
+assert.equal(advancePresentation(oldModal), false);
+assert.deepEqual(gameState.session.presentationQueue, []);
+debugTriggerEvent(() => 0);
+const oldEvent = gameState.session.presentation;
+changeScene(gameState, "HOME");
+assert.equal(advancePresentation(oldEvent), false);
+assert.deepEqual(gameState.session.presentationQueue, []);
+assert.equal(fakeModal.open, false);
+assert.equal(acknowledgeEnvironmentEvent(), false);
+clearActivityResultPresentation();
+document.querySelector = originalQuery;
 console.log("NightMarketLife core tests: PASS");
