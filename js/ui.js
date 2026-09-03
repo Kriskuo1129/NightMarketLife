@@ -9,6 +9,8 @@ import { isInteractionLocked } from "./gameplay.js";
 export const SCENES = Object.freeze({ HOME: "HOME", CHARACTER_SETUP: "CHARACTER_SETUP", NIGHT_MARKET: "NIGHT_MARKET", RESULT: "RESULT" });
 
 export function render(gameState) {
+  const office = document.querySelector("#management-office-dialog");
+  if (office?.open && (gameState.session.scene !== SCENES.NIGHT_MARKET || isInteractionLocked(gameState))) office.close();
   // Close the previous notification before opening the next, in either queue order.
   for (const [id, type] of [["environment-event-dialog", "ENVIRONMENT_EVENT_MODAL"], ["resource-warning-dialog", "RESOURCE_WARNING_MODAL"]]) {
     const dialog = document.querySelector(`#${id}`);

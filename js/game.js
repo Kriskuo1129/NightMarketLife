@@ -7,6 +7,7 @@ import { applyBuildToPlayer } from "./character.js";
 import { changeClothes, changeFace, setCustomAppearance } from "./character-setup.js";
 import { processCustomClothesImage, processCustomFaceImage } from "./uploads.js";
 import { DEFAULT_CLOTHES, FACE_ASSETS, SHOP_CLOTHES } from "../assets/character-assets.js";
+import { getManagementOfficeDialogue } from "./management-office.js";
 import { getResourceZeroWarning, getStallActivity, isInteractionLocked, predictStallAction, projectResources } from "./gameplay.js";
 import { checkEnvironmentEvent, commitPendingEnvironmentEvent, getEffectiveFoodPrice, getEffectiveGameStaminaCost, moveInfluencer, triggerEnvironmentEvent as triggerEvent } from "./events.js";
 
@@ -213,6 +214,7 @@ export function buyFood(stallId, randomFn = Math.random) {
 }
 
 export function createNewGame(characterSettings = loadCharacterSettings() ?? {}) {
+  document.querySelector("#management-office-dialog")?.close();
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   activityPresentationTimer = null;
   resetGameState(characterSettings);
@@ -227,6 +229,7 @@ function resetNightMarketScroll() {
 }
 
 export function startNightMarketFromHome(name = "") {
+  document.querySelector("#management-office-dialog")?.close();
   const legacyAppearance = loadCharacterSettings() ?? {};
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   activityPresentationTimer = null;
@@ -279,9 +282,13 @@ function bindUI() {
     if (button.dataset.cycle) { setStatus(""); render(gameState); }
     if (button.dataset.action === "complete-character") completeCharacterSetup();
     if (button.dataset.stallId) {
-      selectStallAndScroll(button.dataset.stallId);
-      document.querySelector("#stall-detail-dialog")?.showModal();
+      if (button.dataset.stallId === "management") openManagementOffice();
+      else {
+        selectStallAndScroll(button.dataset.stallId);
+        document.querySelector("#stall-detail-dialog")?.showModal();
+      }
     }
+    if (button.dataset.action === "ask-management") askManagementOffice();
     if (button.dataset.action === "enter-stall") enterSelectedStall();
     if (button.dataset.action === "go-home") document.querySelector("#home-dialog")?.showModal();
     if (button.dataset.action === "confirm-home") { button.closest("dialog")?.close(); requestEndGame("HOME"); }
@@ -330,6 +337,29 @@ export function selectStallAndScroll(stallId) {
   return selected;
 }
 
+export function openManagementOffice() {
+  if (gameState.session.scene !== SCENES.NIGHT_MARKET || isInteractionLocked(gameState)) return false;
+  const stall = gameState.stalls.find(item => item.id === "management" && item.type === STALL_TYPES.OFFICE);
+  if (!getStallDisplayStatus(stall, gameState.environment)?.canEnter) return false;
+  const dialog = document.querySelector("#management-office-dialog");
+  if (!dialog) return false;
+  document.querySelector("#stall-detail-dialog")?.close();
+  dialog.querySelector("[data-management-dialogue]").textContent = "少年仔，今天想問什麼？";
+  dialog.querySelector('[data-action="ask-management"]').textContent = "阿伯，今天夜市怎樣？";
+  if (!dialog.open) dialog.showModal();
+  return true;
+}
+
+export function askManagementOffice(randomFn = Math.random) {
+  if (gameState.session.scene !== SCENES.NIGHT_MARKET || isInteractionLocked(gameState)) return false;
+  const dialog = document.querySelector("#management-office-dialog");
+  if (!dialog?.open) return false;
+  const dialogue = getManagementOfficeDialogue(gameState.environment, gameState.stalls, randomFn);
+  dialog.querySelector("[data-management-dialogue]").textContent = dialogue;
+  dialog.querySelector('[data-action="ask-management"]').textContent = "再問問看";
+  return dialogue;
+}
+
 export function getStallPlaceholderCopy(stall) {
   if (!stall) return { title: "老闆還在準備中！", message: "攤位功能將於 Step 4 實作。" };
   if (stall.type === STALL_TYPES.OFFICE) return { title: stall.name, message: "管理處功能將於後續 Step 實作。" };
@@ -352,6 +382,7 @@ export function showSelectedStallPlaceholder() {
 export function enterSelectedStall() {
   if (isInteractionLocked(gameState)) return false;
   const stall = getSelectedStall(gameState);
+  if (stall?.id === "management") return openManagementOffice();
   const failure = getStallEntryFailure(stall);
   if (failure) { showEntryFailure(failure); return false; }
   if (stall?.type === STALL_TYPES.FOOD) {

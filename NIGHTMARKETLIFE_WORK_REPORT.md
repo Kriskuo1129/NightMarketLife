@@ -921,3 +921,43 @@ HOME／New Game 清 Pending、Presentation Queue 與 Modal；正常場景入口�
 新增 `tests/environment-flow.browser.cjs`，使用本機伺服器與 Playwright 驅動 Edge headless（獨立測試 context，非真實手機硬體）。實際確認九種事件：Rain Start／Stop、Mosquito Start／Stop、Price Up、Reward Up、Crowd Up、Influencer Start／Leave。Modal 前正式 State 不變、Render 不重抽，點擊「知道了」後才修改；Rain Stage 文字與效果、Food Card 的網紅封鎖同步符合 Commit 時機。另等待真實 2.4 秒 Timer，確認 Activity → Event → Resource 的順序；New Game 關閉 Pending Modal。Console Error 0。
 
 320×844、390×844、390×900、430×932 的 Event Modal 均完整位於 Viewport 內，無水平 Overflow／整頁 Gameplay Scroll；已檢視 320px 截圖。Browser suite 與 Core suite 最終皆 PASS。未修改 Layout、Gameplay 數值或其他 Step；未 Commit、未 Push。
+
+---
+
+## Step 5：Management Office / 管理處阿伯
+
+### 定位與 Hidden Environment 原則
+
+既有 `management`（夜市管理處）維持 OFFICE Special Stall、原有 Card 名稱／營業狀態與 null Life。點擊 Card 直接開啟管理處 Modal，不再經過未來功能 Placeholder。阿伯是純資訊 NPC，不是 Dashboard；Modal 僅有問候、對話、一顆詢問／再問按鈕與「沒事，我再逛逛」。使用現有咖啡暖色按鈕、文字／CSS「伯」Placeholder 與舊扇子的敘述，未新增正式圖片素材。
+
+對話只講現象與趨勢，不輸出 Level、Multiplier、Penalty、Threshold、Internal Event ID 或 Gameplay 公式。本輪沒有改動既有 Event Modal 等其他畫面的文案或顯示規則。
+
+### Natural Language Hint Architecture / Dialogue Pool
+
+新模組 `js/management-office.js` 集中 `MANAGEMENT_DIALOGUE_POOLS`、`collectManagementHints()`、`selectManagementHints()`、`getManagementOfficeDialogue()`。Helper 只接收正式 Environment、Stalls 與可注入的 randomFn，不接收 Session／Pending，也不修改輸入資料。UI handler 不包含 Environment 分支；只以 textContent 顯示產生的一段口語回答。
+
+Rain、Mosquito、Influencer 各有至少三句；Influencer 會將正式 blocked stall ID 轉成實際攤名，沒有合法目標則用不宣稱位置的口語回答。Crowd 依低／一般／高／極高、Price 與 Reward 依低／高／很高轉為模糊描述，不输出數字。Normal Night 保留五句日常回答，不硬湊情報；另有三句隨機收尾，不是每次都加入。
+
+### Hint Priority / Selection / Repeated Ask
+
+雨、蚊子、網紅權重 4；明顯 Crowd／Price／Reward 權重 2；一般 Crowd 權重 0.5。每次加權、不放回抽取最多兩到三個主題（候選不足時更少），排序與句子可變，不列 Status List。只有一般狀態時直接採 Normal Pool。選取邏輯複製候選陣列，不改動原始資料；每個主題同次最多出現一次。
+
+第一次詢問後，Primary 文案換成「再問問看」，再按會重新挑選主題與句子。對話只保留在當前 Modal DOM，不存 Session／LocalStorage，不建大型 Dialogue Engine；一般 Render 不重新抽台詞。
+
+### Gameplay Zero Side Effect / Transaction Compatibility
+
+`openManagementOffice()`／`askManagementOffice()` 都檢查 NIGHT_MARKET 與既有 Interaction Lock。入口也確認既有管理處可進入；Pending Event 不可繞過，Helper 即使直接測試也只能讀正式 Environment。Event Confirm 後下次問話自然使用 Commit 後的 Environment。
+
+不呼叫 ActivityResult、Life 消耗、Environment Trigger、Influencer 移動或任何 Statistics 更新；不增加 Action／totalActions、資源、精彩分數，不修改 nextEventAt、Environment、Stage 或 Presentation Queue。完整 GameState（含 Session、Statistics、Life）與 Storage 以詢問前後快照驗證完全相同。沒有新增 managementVisits 等欄位。HOME／New Game 會關閉管理處；Debug 產生 Blocking Notification 時也會關閉管理處，避免與 Event Modal 疊加。Escape／Secondary 按鈕沿用正常關閉流程。
+
+### Core Tests
+
+`tests/core.test.mjs` PASS。新增文案 Pool 最低句數、隱藏數值／系統詞掃描、Rain／Mosquito／Influencer 實際名稱與無目標 fallback、Crowd／Price／Reward／Normal 語意、權重順序、百組固定 seed 的最多三個主題與組合變化、Helper 輸入不變、連續二十次詢問完整 State／Storage 不變、Pending 鎖與僅讀正式 Environment、Commit 後讀到雨勢、HOME／New Game 關閉。既有 Environment Transaction 與 Gameplay／Avatar／Legacy／Storage 核心回歸測試保留並全部 PASS。
+
+### Browser / Responsive Result
+
+新增 `tests/management-office.browser.cjs`，以 Playwright／Edge headless 的獨立本機測試 context 驗收（非真實手機硬體）：HOME → NIGHT_MARKET → 管理處 → 問阿伯 → 再問 → 關閉；七組 Normal／Rain／Mosquito／Influencer／Crowd／Price／Reward Debug Environment 均產生口語回答，管理處文字不出現精確參數或系統詞。每組重複詢問後，完整 GameState 與 Storage 快照不變；Pending 時 Card Disabled、不可同時開管理處，確認後阿伯才提到雨。Escape 關閉與 Home Card → RESULT 也通過。
+
+320×844、390×844、390×900、430×932 各以多次複合環境長對話測試：Modal 完整位於 Viewport、文字安全換行、無內容／頁面水平 Overflow、無 Body Gameplay Scroll、問話與關閉按鈕可見可操作。Modal 保留 max-height 與內部 overflow-y:auto；已檢視 320px 截圖。管理處 Browser suite Console Error／Warning 0。另重跑 `tests/environment-flow.browser.cjs`，九種事件、Event → Resource 順序與四尺寸皆 PASS。
+
+本輪僅實作 Step 5 管理處對話，沒有新增事件、成就、結算、裝備、服飾 Gameplay、Stall、後端或 Luck；沒有更動既有 Environment Transaction 或 Gameplay 規則。完成後檢查 git status／git diff，不 Commit、不 Push，等待確認。

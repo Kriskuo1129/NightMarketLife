@@ -122,6 +122,13 @@ dialog { width:min(calc(100% - 2rem),27rem); max-height:calc(100vh - 2rem); padd
 .modal-secondary-button:active { border-color:#b97a4c; background:#18100e; transform:translateY(.1rem); }
 .modal-secondary-button:focus-visible { outline:2px solid var(--nml-gold); outline-offset:2px; }
 .result-scene { text-align:center; }
+.management-office-dialog { width:calc(100% - 2rem); max-width:26rem; max-height:calc(100dvh - 2rem); overflow-y:auto; border-color:#ad7946; border-radius:.4rem; background:linear-gradient(145deg,#302017,#1e1410); }
+.management-office-heading { display:flex; align-items:center; gap:.8rem; border-bottom:1px solid #765032; padding-bottom:.8rem; }
+.management-uncle { display:grid; place-items:center; flex:0 0 3rem; height:3rem; border:2px solid #ad7946; border-radius:45% 45% 35% 35%; background:#523923; color:#f1d7aa; font-size:1.4rem; font-family:serif; transform:rotate(-4deg); }
+.management-scene-copy { color:#c8af91; font-size:.8rem; }
+.management-dialogue { border-left:2px solid #c99758; padding:.4rem 0 .4rem .8rem; color:#fff0d7; line-height:1.8; overflow-wrap:anywhere; }
+.management-office-actions { display:grid; gap:.65rem; margin-top:1rem; }
+.management-office-actions button { min-width:0; padding:.75rem; }
 .result-identity { display:grid; justify-items:center; gap:.45rem; margin:1rem 0; }
 .avatar-frame--result { width:5rem; }
 .result-player { color:#e6cba7; }

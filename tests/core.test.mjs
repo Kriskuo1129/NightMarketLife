@@ -817,4 +817,79 @@ for (const cleanup of [() => createNewGame(), () => window.NMLDebug.changeScene(
   assert.equal(isInteractionLocked(gameState), false);
 }
 clearActivityResultPresentation();
+// Step 5: the office is a read-only conversation, not an Environment dashboard.
+const { collectManagementHints, selectManagementHints, getManagementOfficeDialogue, MANAGEMENT_DIALOGUE_POOLS } = await import("../js/management-office.js");
+const { openManagementOffice, askManagementOffice } = await import("../js/game.js");
+const hiddenTerms = /[0-9×=+]|crowdLevel|priceLevel|rewardLevel|multiplier|Penalty|nextEventAt|Action|INFLUENCER|RAIN_START|MOSQUITO_START|influencerBlockedStallId|倍率|參數|等級|Buff|Debuff/i;
+for (const key of ["rain", "mosquito", "influencer"]) assert.ok(MANAGEMENT_DIALOGUE_POOLS[key].length >= 3);
+assert.ok(MANAGEMENT_DIALOGUE_POOLS.normal.length >= 5);
+for (const pool of Object.values(MANAGEMENT_DIALOGUE_POOLS)) for (const line of pool) assert.doesNotMatch(line, hiddenTerms);
+freshFlow();
+const normalEnvironment = { ...gameState.environment };
+assert.ok(MANAGEMENT_DIALOGUE_POOLS.normal.includes(getManagementOfficeDialogue(normalEnvironment, gameState.stalls, () => 0)));
+for (const [change, semantic] of [
+  [{ raining: true }, /雨/], [{ mosquito: true }, /蚊子/],
+  [{ influencer: true, influencerBlockedStallId: "food_01" }, /測試小吃攤 A/],
+  [{ influencer: true, influencerBlockedStallId: null }, /网紅|網紅/],
+  [{ crowdLevel: 1 }, /人/], [{ crowdLevel: 5 }, /人/],
+  [{ priceLevel: 0 }, /佛心|價錢/], [{ priceLevel: 3 }, /不便宜|價錢/],
+  [{ rewardLevel: 0 }, /小氣|獎品/], [{ rewardLevel: 4 }, /敢送|大方/]
+]) {
+  const environment = { ...normalEnvironment, ...change };
+  const before = JSON.stringify({ environment, stalls: gameState.stalls });
+  const dialogue = getManagementOfficeDialogue(environment, gameState.stalls, () => 0);
+  assert.match(dialogue, semantic);
+  assert.doesNotMatch(dialogue, hiddenTerms);
+  assert.equal(JSON.stringify({ environment, stalls: gameState.stalls }), before);
+}
+const busyEnvironment = { ...normalEnvironment, raining: true, mosquito: true, influencer: true, influencerBlockedStallId: "food_01", crowdLevel: 5, priceLevel: 3, rewardLevel: 4 };
+const allHints = collectManagementHints(busyEnvironment, gameState.stalls);
+assert.equal(allHints.length, 6);
+assert.ok(allHints.find(h => h.key === "rain").weight > allHints.find(h => h.key === "price").weight);
+const combinations = new Set();
+for (let seed = 1; seed <= 100; seed += 1) {
+  let value = seed;
+  const rng = () => ((value = (value * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const hints = selectManagementHints(allHints, rng);
+  assert.ok(hints.length >= 2 && hints.length <= 3);
+  assert.equal(new Set(hints.map(h => h.key)).size, hints.length);
+  combinations.add(hints.map(h => h.key).join("|"));
+  assert.doesNotMatch(getManagementOfficeDialogue(busyEnvironment, gameState.stalls, rng), hiddenTerms);
+}
+assert.ok(combinations.size > 1);
+const officeFields = {};
+const officeModal = { open: false, showModal() { this.open = true; }, close() { this.open = false; }, querySelector(selector) { return officeFields[selector] ??= { textContent: "" }; } };
+const beforeOfficeQuery = document.querySelector;
+document.querySelector = selector => selector === "#management-office-dialog" ? officeModal : null;
+freshFlow();
+const officeStateSnapshot = JSON.stringify(gameState);
+const officeStorageSnapshot = JSON.stringify([...localStorage.values]);
+assert.equal(askManagementOffice(), false);
+assert.equal(openManagementOffice(), true);
+for (let i = 0; i < 20; i += 1) assert.equal(typeof askManagementOffice(() => i / 20), "string");
+assert.equal(officeFields['[data-action="ask-management"]'].textContent, "再問問看");
+officeModal.close();
+assert.equal(JSON.stringify(gameState), officeStateSnapshot);
+assert.equal(JSON.stringify([...localStorage.values]), officeStorageSnapshot);
+assert.equal(findStall("management").life, null);
+assert.equal(openManagementOffice(), true);
+debugTriggerEvent(() => 0);
+assert.equal(officeModal.open, false);
+assert.equal(gameState.environment.raining, false);
+assert.ok(MANAGEMENT_DIALOGUE_POOLS.normal.includes(getManagementOfficeDialogue(gameState.environment, gameState.stalls, () => 0)));
+const pendingOfficeSnapshot = JSON.stringify(gameState);
+assert.equal(openManagementOffice(), false);
+assert.equal(askManagementOffice(), false);
+assert.equal(JSON.stringify(gameState), pendingOfficeSnapshot);
+acknowledgeEnvironmentEvent();
+assert.equal(openManagementOffice(), true);
+assert.match(askManagementOffice(() => 0), /雨/);
+createNewGame();
+assert.equal(officeModal.open, false);
+assert.equal(openManagementOffice(), true);
+window.NMLDebug.changeScene("HOME");
+assert.equal(officeModal.open, false);
+assert.equal(openManagementOffice(), false);
+document.querySelector = beforeOfficeQuery;
+clearActivityResultPresentation();
 console.log("NightMarketLife core tests: PASS");
