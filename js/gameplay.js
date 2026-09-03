@@ -25,24 +25,26 @@ export function getStallActivity(stall, environment) {
 export function predictStallAction(state, stall) {
   const activity = getStallActivity(stall, state.environment);
   if (!activity) return null;
-  const after = projectResources(state.player, activity, state.environment.mosquito);
-  const warnings = [];
-  if (after.stamina <= 0) warnings.push("⚠️ 完成這次行動後體力將歸零，今晚會直接結束。");
-  if (after.money <= 0) warnings.push(stall.type === "FOOD"
-    ? "⚠️ 買完之後你會身無分文，今晚將直接結束。"
-    : "⚠️ 完成這次行動後你會身無分文，今晚會直接結束。");
-  return { ...after, warnings };
+  return projectResources(state.player, activity, state.environment.mosquito);
 }
 
-export const getExhaustionReason = player => player.stamina <= 0 ? "STAMINA_EXHAUSTED" : player.money <= 0 ? "MONEY_EXHAUSTED" : null;
-export const END_MESSAGES = {
-  STAMINA_EXHAUSTED: { title: "眼前一黑", description: "你的腳步越來越沉，下一秒眼前一黑。今晚看來只能到這裡了。" },
-  MONEY_EXHAUSTED: { title: "口袋比臉還乾淨", description: "你摸了摸口袋，連最後一個銅板都沒有。再逛下去也只能幫老闆顧攤，今晚還是回家吧。" }
-};
+export function getResourceZeroWarning(before, after) {
+  const stamina = before.stamina > 0 && after.stamina === 0;
+  const money = before.money > 0 && after.money === 0;
+  if (!stamina && !money) return null;
+  return {
+    type: "RESOURCE_WARNING_MODAL",
+    title: stamina && money ? "又累又窮" : stamina ? "體力耗盡！" : "身無分文！",
+    description: stamina && money
+      ? "你的腳已經不行了，口袋也乾乾淨淨。今晚突然變得有點艱難。"
+      : stamina ? "你的腳……真的不行了 QQ。先找點東西補充體力吧。" : "你翻遍了所有口袋，真的一塊錢都沒有了。",
+    effectLines: [stamina && "❤️ 體力已歸零", money && "💰 金錢已歸零"].filter(Boolean)
+  };
+}
 
 export function isInteractionLocked(state) {
   const session = state.session;
-  return Boolean(session.endReason || session.exhaustionPending ||
+  return Boolean(session.endReason ||
     [session.presentation, ...session.presentationQueue].some(item =>
-      ["ENVIRONMENT_EVENT", "ENVIRONMENT_EVENT_MODAL", "END_REASON_MODAL"].includes(item?.type)));
+      ["ENVIRONMENT_EVENT_MODAL", "RESOURCE_WARNING_MODAL"].includes(item?.type)));
 }

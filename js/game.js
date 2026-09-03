@@ -7,8 +7,8 @@ import { applyBuildToPlayer } from "./character.js";
 import { changeClothes, changeFace, setCustomAppearance } from "./character-setup.js";
 import { processCustomClothesImage, processCustomFaceImage } from "./uploads.js";
 import { DEFAULT_CLOTHES, FACE_ASSETS, SHOP_CLOTHES } from "../assets/character-assets.js";
-import { END_MESSAGES, getExhaustionReason, getStallActivity, isInteractionLocked, predictStallAction, projectResources } from "./gameplay.js";
-import { checkEnvironmentEvent, EVENT_MESSAGES, getEnvironmentEventUI, getEffectiveFoodPrice, getEffectiveGameStaminaCost, moveInfluencer, triggerEnvironmentEvent as triggerEvent } from "./events.js";
+import { getResourceZeroWarning, getStallActivity, isInteractionLocked, predictStallAction, projectResources } from "./gameplay.js";
+import { checkEnvironmentEvent, getEnvironmentEventUI, getEffectiveFoodPrice, getEffectiveGameStaminaCost, moveInfluencer, triggerEnvironmentEvent as triggerEvent } from "./events.js";
 
 export function normalizeActivityResult(result = {}) {
   return {
@@ -21,7 +21,7 @@ export function normalizeActivityResult(result = {}) {
   };
 }
 
-export function applyActivityResult(result, { mosquito = false, deferEnding = false } = {}) {
+export function applyActivityResult(result, { mosquito = false, deferNotification = false } = {}) {
   if (isInteractionLocked(gameState)) return false;
   const activity = normalizeActivityResult(result);
   if (![activity.staminaDelta, activity.moneyDelta, activity.scoreDelta, activity.progressCost].every(Number.isFinite)) {
@@ -37,10 +37,10 @@ export function applyActivityResult(result, { mosquito = false, deferEnding = fa
   gameState.progress.actionCount += activity.progressCost;
   gameState.statistics.totalActions += activity.progressCost;
   gameState.session.lastActivitySourceId = activity.sourceId || null;
-  gameState.session.exhaustionPending = Boolean(getExhaustionReason(player));
-  if (gameState.session.exhaustionPending && !deferEnding) enqueuePresentation({ type: "EXHAUSTION_CHECK" });
+  const resourceWarning = getResourceZeroWarning(before, player);
+  if (resourceWarning && !deferNotification) enqueuePresentation(resourceWarning);
   render(gameState);
-  return { ...activity, appliedDeltas: {
+  return { ...activity, resourceWarning, appliedDeltas: {
     staminaDelta: player.stamina - before.stamina,
     moneyDelta: player.money - before.money,
     scoreDelta: player.score - before.score
@@ -62,13 +62,19 @@ export function clearActivityResultPresentation(presentation = gameState.session
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   gameState.session.presentation = null;
   gameState.session.presentationQueue = [];
-  gameState.session.exhaustionPending = false;
   activityPresentationTimer = null;
   render(gameState);
   return true;
 }
 
 export function showActivityResultPresentation(stall, activity) {
+  // Rapid successful actions may replace an unfinished visual result, but never a notification.
+  // This keeps the next event at most one result-duration away instead of accumulating timers.
+  if (gameState.session.presentation?.type === "ACTIVITY_RESULT" && gameState.session.presentationQueue.length === 0) {
+    if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
+    activityPresentationTimer = null;
+    gameState.session.presentation = null;
+  }
   const presentation = {
     type: "ACTIVITY_RESULT",
     title: `${stall.name} ${stall.type === STALL_TYPES.FOOD ? "補充完成" : "挑戰完成"}！`,
@@ -87,20 +93,12 @@ function enqueuePresentation(presentation) {
 
 export function advancePresentation(expected = gameState.session.presentation) {
   if (expected !== gameState.session.presentation) return false;
-  if (["ENVIRONMENT_EVENT_MODAL", "END_REASON_MODAL"].includes(expected?.type)) return false;
+  if (["ENVIRONMENT_EVENT_MODAL", "RESOURCE_WARNING_MODAL"].includes(expected?.type)) return false;
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
-  let presentation = gameState.session.presentationQueue.shift() ?? null;
-  if (presentation?.type === "EXHAUSTION_CHECK") {
-    const reason = getExhaustionReason(gameState.player);
-    gameState.session.exhaustionPending = false;
-    gameState.session.presentation = null;
-    activityPresentationTimer = null;
-    if (reason) return requestEndGame(reason);
-    presentation = null;
-  }
+  const presentation = gameState.session.presentationQueue.shift() ?? null;
   gameState.session.presentation = presentation;
   activityPresentationTimer = null;
-  if (presentation && !["ENVIRONMENT_EVENT_MODAL", "END_REASON_MODAL"].includes(presentation.type)) {
+  if (presentation && !["ENVIRONMENT_EVENT_MODAL", "RESOURCE_WARNING_MODAL"].includes(presentation.type)) {
     activityPresentationTimer = setTimeout(() => advancePresentation(presentation), ACTIVITY_PRESENTATION_DURATION);
     activityPresentationTimer?.unref?.();
   }
@@ -111,7 +109,6 @@ export function advancePresentation(expected = gameState.session.presentation) {
 function presentEvent(event) {
   if (!event) return;
   const ui = getEnvironmentEventUI(event, gameState);
-  enqueuePresentation({ type: "ENVIRONMENT_EVENT", eventId: event.eventId, title: EVENT_MESSAGES[event.eventId] });
   enqueuePresentation({ type: "ENVIRONMENT_EVENT_MODAL", eventId: event.eventId, ...ui });
 }
 
@@ -122,25 +119,20 @@ export function acknowledgeEnvironmentEvent() {
 }
 
 export function requestEndGame(reason) {
-  if (gameState.session.endReason || (reason !== "HOME" && !END_MESSAGES[reason])) return false;
-  if (reason === "HOME" && isInteractionLocked(gameState)) return false;
+  if (reason !== "HOME" || isInteractionLocked(gameState)) return false;
   gameState.session.endReason = reason;
-  if (reason === "HOME") changeScene(gameState, SCENES.RESULT);
-  else {
-    gameState.session.presentation = { type: "END_REASON_MODAL", reason, ...END_MESSAGES[reason] };
-    render(gameState);
-  }
-  return true;
-}
-
-export function acknowledgeEndGame() {
-  if (gameState.session.presentation?.type !== "END_REASON_MODAL") return false;
   changeScene(gameState, SCENES.RESULT);
   return true;
 }
 
+export function acknowledgeResourceWarning() {
+  if (gameState.session.presentation?.type !== "RESOURCE_WARNING_MODAL") return false;
+  gameState.session.presentation = null;
+  return advancePresentation();
+}
+
 export function triggerEnvironmentEvent(randomFn = Math.random) {
-  if (gameState.session.endReason || gameState.session.exhaustionPending) return false;
+  if (gameState.session.endReason) return false;
   const event = triggerEvent(gameState, randomFn);
   presentEvent(event);
   render(gameState);
@@ -153,7 +145,7 @@ function completeStallAction(stall, activity, randomFn) {
   const event = checkEnvironmentEvent(gameState, randomFn);
   showActivityResultPresentation(stall, activity);
   presentEvent(event);
-  if (gameState.session.exhaustionPending) enqueuePresentation({ type: "EXHAUSTION_CHECK" });
+  if (activity.resourceWarning) enqueuePresentation(activity.resourceWarning);
   render(gameState);
 }
 
@@ -165,7 +157,7 @@ export function playTestGame(stallId, randomFn = Math.random) {
   const failure = getStallEntryFailure(stall);
   if (failure) { showEntryFailure(failure); return false; }
   const environment = gameState.environment;
-  const activity = applyActivityResult(getStallActivity(stall, environment), { mosquito: environment.mosquito, deferEnding: true });
+  const activity = applyActivityResult(getStallActivity(stall, environment), { mosquito: environment.mosquito, deferNotification: true });
   gameState.statistics.gamePlays[stall.id] = (gameState.statistics.gamePlays[stall.id] ?? 0) + 1;
   gameState.statistics.stallVisits[stall.id] = (gameState.statistics.stallVisits[stall.id] ?? 0) + 1;
   completeStallAction(stall, activity, randomFn);
@@ -201,7 +193,7 @@ export function buyFood(stallId, randomFn = Math.random) {
   if (!stall || stall.type !== STALL_TYPES.FOOD || !FOOD_CONFIG[stallId]) return false;
   const failure = getStallEntryFailure(stall);
   if (failure) { showEntryFailure(failure); return false; }
-  const activity = applyActivityResult(getStallActivity(stall, gameState.environment), { mosquito: gameState.environment.mosquito, deferEnding: true });
+  const activity = applyActivityResult(getStallActivity(stall, gameState.environment), { mosquito: gameState.environment.mosquito, deferNotification: true });
   gameState.statistics.foodPurchases += 1;
   gameState.statistics.stallVisits[stall.id] = (gameState.statistics.stallVisits[stall.id] ?? 0) + 1;
   completeStallAction(stall, activity, randomFn);
@@ -246,7 +238,7 @@ function setAvatarStatus(message = "") {
 
 function bindUI() {
   document.querySelector("#environment-event-dialog")?.addEventListener("cancel", event => event.preventDefault());
-  document.querySelector("#end-reason-dialog")?.addEventListener("cancel", event => event.preventDefault());
+  document.querySelector("#resource-warning-dialog")?.addEventListener("cancel", event => event.preventDefault());
   document.addEventListener("submit", (event) => {
     if (event.target.id !== "home-form") return;
     event.preventDefault();
@@ -257,7 +249,7 @@ function bindUI() {
     const button = event.target.closest("button");
     if (!button) return;
     if (button.dataset.action === "acknowledge-event") { acknowledgeEnvironmentEvent(); return; }
-    if (button.dataset.action === "acknowledge-end") { acknowledgeEndGame(); return; }
+    if (button.dataset.action === "acknowledge-resource") { acknowledgeResourceWarning(); return; }
     if (isInteractionLocked(gameState) && gameState.session.scene === SCENES.NIGHT_MARKET) return;
     if (button.dataset.action === "show-pro") document.querySelector("#pro-dialog")?.showModal();
     if (button.dataset.action === "open-build") {

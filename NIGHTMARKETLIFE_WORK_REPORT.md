@@ -839,3 +839,47 @@ New Game 清 Timer 並重置 Session；HOME 清 queue、兩種 Modal、exhaustio
 320×844、390×844、390×900、430×932 都檢查 Event Modal、Entry Warning、End Modal：無水平 Overflow、Modal 在螢幕範圍內，Warning／End 按鈕可見可操作。End Modal 符合原生 :modal，背景 Stall 全部 disabled；CSS 支援長文字換行與超高內容垂直 Scroll。金錢結束與 Event+End 的精確數值／順序由固定核心測試驗證，未宣稱所有隨機排列均做瀏覽器實測。
 
 本次只完成附件指定三項 Flow Patch，沒有新增 Environment Event、Luck、正式 Settlement、其他 Gameplay 或後端。完成後檢查 git status／git diff，不 Commit、不 Push，等待確認。
+
+## Gameplay Flow Revision：Resource Zero Warning + Event Immediate Notification
+
+### Resource Exhaustion Game Over 移除
+
+本節取代上一版資源歸零 Ending 規則。移除 STAMINA_EXHAUSTED／MONEY_EXHAUSTED 的正式處理、End Reason Modal、exhaustionPending 與 EXHAUSTION_CHECK。stamina／money 仍最低 Clamp 0，但歸零不進 RESULT、不重設 Session、不關店。requestEndGame 僅接受既有 HOME 手動回家流程。
+
+### Resource Zero Warning
+
+`getResourceZeroWarning(before, after)` 依成功 Apply 前後的實際資源，只判定 >0→0。僅體力歸零為「體力耗盡！」、僅金錢歸零為「身無分文！」、同時歸零為單一「又累又窮」，使用指定描述與效果文字。已為0的資源不重複通知；未完成／失敗 Action 不通知。
+
+新增 RESOURCE_WARNING_MODAL，按「知道了」後繼續 NIGHT_MARKET，仍依原 Entry Restriction 判斷可用行動。體力0但有錢可買食物；金錢0但體力足夠可玩不收錢的遊戲。通知本身不修改 Gameplay State／History／Stall。
+
+### Entry Warning 移除
+
+刪除 Entry End Warning 的 HTML、CSS、UI Prediction 文字，剛好支付成本仍可進場，行動完成後才通知。保留 gameplay.js 的 getStallActivity／projectResources 共用實際計算與 Clamp 順序；predictStallAction 僅回傳預測資源數值供 Debug／Tests 使用，不再產生 Warning 或 Game Over 判斷。
+
+### Event Modal Timing / Blocking 與 Non-blocking
+
+正式 Queue 改為 ACTIVITY_RESULT（2.4秒）→ ENVIRONMENT_EVENT_MODAL，不再排 ENVIRONMENT_EVENT Stage Timer。Modal 顯示時舞台同步顯示該事件。採附件允許的方案 A：通知確認後立即回正常 Environment Status；沒有剩餘視覺 Timer 繼續鎖操作。
+
+普通 Activity Result 是不阻擋操作的視覺演出；快速連續成功行動可更新尚未播完、且沒有 Pending 通知的普通結果，避免舊結果累積多段2.4秒等待。Gameplay 計數與資源不省略；Event／Resource 通知永不因此被覆蓋，維持 FIFO。
+
+### Event + Resource Modal Ordering
+
+同次行動依序：Activity Result → Environment Event Modal → 確認 → Resource Warning Modal → 確認 → Gameplay。只有一種通知時直接省略另一種。Pending 通知阻擋插入新 Action；每個 Modal 都無獨立 Timeout。Render 先關閉上一種通知再開下一種，避免兩個 Blocking Modal 重疊；同類連續通知可在同一原生 dialog 更新內容。
+
+### Cleanup / Debug
+
+HOME／New Game 清 Presentation Queue、Pending 通知與 Timer，render 關閉通知，舊 callback 以 identity guard 失效。沒有獨立 Resource Pending State、沒有通知 LocalStorage。既有 NMLDebug.triggerEnvironmentEvent 走正式即時 Event Modal Flow；predictStallAction 保留唯讀數值預測。
+
+### Tests
+
+完整核心測試：**NightMarketLife core tests: PASS**。
+
+更新舊的 Game Over／Stage延遲期待，驗證：stamina10正常遊戲、雨天15、蚊子15→0／16→1；Food Clamp順序；money119拒絕／120可購買且通知／121不通知；雙資源Clamp與單一雙歸零通知；原本0不重複通知；通知後可買食物／玩免費遊戲；失敗與completed=false無副作用；Event僅一次advance立即開Modal；Event→Resource順序；確認即解除Lock；HOME手動RESULT仍保留；新局／HOME清理與stale callback；Entry Warning與Ending Dialog已移除；快速四次Action不堆積舊結果阻擋事件通知。原核心架構、Avatar／Legacy／Storage及Gameplay回歸測試保留。
+
+### Responsive / Browser
+
+自然遊玩實測網紅事件與人潮減少事件。Modal與舞台標題同步；按知道了立即恢復操作。實際體力10進場時無預警，成功歸零且觸發事件，先看Event Modal、再看「體力耗盡！」，兩次確認後仍在夜市，可購買食物，體力0→30。另完成手動回家→RESULT→HOME→新局，資源與操作正常。
+
+320×844、390×844、390×900、430×932 均檢查Event與Resource Modal：無水平Overflow、無Body Gameplay Scroll、按鈕可見可操作，Resource通知時只存在一個open dialog。長文字沿用換行與安全垂直捲動樣式。Money／雙歸零排列由核心測試驗證，未宣稱全部文案都獨立完成瀏覽器實測。
+
+本次只修正指定三項Revision，未新增其他功能或Luck。完成後檢查git status／git diff，不Commit、不Push，等待確認。

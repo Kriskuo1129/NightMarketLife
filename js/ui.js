@@ -4,13 +4,18 @@ import { getAppearanceView } from "./character-setup.js";
 import { renderAllCharacters } from "./character-renderer.js";
 import { getStallDisplayStatus } from "./stalls.js";
 import { getEffectiveFoodPrice, getEffectiveGameStaminaCost } from "./events.js";
-import { isInteractionLocked, predictStallAction } from "./gameplay.js";
+import { isInteractionLocked } from "./gameplay.js";
 
 export const SCENES = Object.freeze({ HOME: "HOME", CHARACTER_SETUP: "CHARACTER_SETUP", NIGHT_MARKET: "NIGHT_MARKET", RESULT: "RESULT" });
 
 export function render(gameState) {
+  // Close the previous notification before opening the next, in either queue order.
+  for (const [id, type] of [["environment-event-dialog", "ENVIRONMENT_EVENT_MODAL"], ["resource-warning-dialog", "RESOURCE_WARNING_MODAL"]]) {
+    const dialog = document.querySelector(`#${id}`);
+    if (dialog?.open && gameState.session.presentation?.type !== type) dialog.close();
+  }
   renderEnvironmentEventModal(gameState);
-  renderEndReasonModal(gameState);
+  renderResourceWarningModal(gameState);
   document.querySelectorAll("[data-scene]").forEach((element) => {
     element.hidden = element.dataset.scene !== gameState.session.scene;
   });
@@ -55,7 +60,6 @@ export function changeScene(gameState, scene) {
   if (scene === SCENES.HOME || scene === SCENES.RESULT) {
     gameState.session.presentation = null;
     gameState.session.presentationQueue = [];
-    gameState.session.exhaustionPending = false;
     if (scene === SCENES.HOME) gameState.session.endReason = null;
   }
   gameState.session.scene = scene;
@@ -116,7 +120,7 @@ function renderEnvironmentStage(gameState) {
   const presentation = gameState.session.presentation;
   const view = getEnvironmentStageView(gameState.environment);
   const showingResult = presentation?.type === "ACTIVITY_RESULT";
-  const showingEvent = ["ENVIRONMENT_EVENT", "ENVIRONMENT_EVENT_MODAL"].includes(presentation?.type);
+  const showingEvent = presentation?.type === "ENVIRONMENT_EVENT_MODAL";
   stage.dataset.presentation = showingResult ? "activity-result" : showingEvent ? "environment-event" : "environment";
   stage.dataset.environmentStage = view.code;
   stage.dataset.raining = String(view.raining);
@@ -234,12 +238,6 @@ export function renderNightMarket(gameState) {
   if (stamina) stamina.closest(".stall-entry-cost").hidden = stall.type !== "GAME";
   document.querySelectorAll("[data-food-info]").forEach((element) => { element.hidden = stall.type !== "FOOD"; });
   const enterButton = document.querySelector('#stall-detail-dialog [data-action="enter-stall"]');
-  const warning = document.querySelector("[data-entry-warning]");
-  if (warning) {
-    const prediction = predictStallAction(gameState, stall);
-    warning.textContent = prediction?.warnings.join("\n") ?? "";
-    warning.hidden = !warning.textContent || !view.canEnter;
-  }
   if (enterButton) {
     enterButton.disabled = locked || !view.canEnter;
     enterButton.textContent = stall.type === "FOOD" ? "購買" : "前往攤位";
@@ -260,15 +258,16 @@ function renderEnvironmentEventModal(gameState) {
   if (!dialog.open) dialog.showModal();
 }
 
-function renderEndReasonModal(gameState) {
-  const dialog = document.querySelector("#end-reason-dialog");
+function renderResourceWarningModal(gameState) {
+  const dialog = document.querySelector("#resource-warning-dialog");
   if (!dialog) return;
   const presentation = gameState.session.presentation;
-  if (presentation?.type !== "END_REASON_MODAL") {
+  if (presentation?.type !== "RESOURCE_WARNING_MODAL") {
     if (dialog.open) dialog.close();
     return;
   }
-  dialog.querySelector("[data-end-title]").textContent = presentation.title;
-  dialog.querySelector("[data-end-description]").textContent = presentation.description;
+  dialog.querySelector("[data-resource-title]").textContent = presentation.title;
+  dialog.querySelector("[data-resource-description]").textContent = presentation.description;
+  dialog.querySelector("[data-resource-effects]").textContent = presentation.effectLines.join("\n");
   if (!dialog.open) dialog.showModal();
 }

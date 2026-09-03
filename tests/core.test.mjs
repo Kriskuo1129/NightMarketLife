@@ -434,7 +434,7 @@ assert.equal(gameState.player.stamina, 0);
 const mosquitoFailure = snapshot();
 assert.equal(playTestGame("game_03", () => 0), false);
 assert.equal(snapshot(), mosquitoFailure);
-createNewGame({ buildId: "worker" }); // exhaustion ends the previous night
+createNewGame({ buildId: "worker" }); // isolate the resource notification from the next calculation
 gameState.environment.mosquito = true;
 gameState.player.stamina = 100;
 gameState.progress.nextEventAt = 100;
@@ -457,7 +457,7 @@ gameState.player.stamina = 50;
 assert.ok(buyFood("food_01", () => 0));
 assert.equal(gameState.player.money, 0);
 assert.equal(gameState.player.stamina, 65);
-createNewGame({ buildId: "worker" }); // money=0 now ends a night
+createNewGame({ buildId: "worker" }); // isolate the resource notification from the reward calculation
 gameState.environment.rewardLevel = 2;
 gameState.player.money = 0;
 assert.equal(playTestGame("game_01", () => 0).scoreDelta, 24);
@@ -472,11 +472,10 @@ assert.equal(firstActual.appliedDeltas.staminaDelta, -10); // event affects next
 assert.equal(gameState.environment.raining, true);
 assert.equal(gameState.progress.nextEventAt, 5);
 assert.equal(gameState.session.presentation.type, "ACTIVITY_RESULT");
-assert.equal(gameState.session.presentationQueue.length, 2);
-assert.equal(gameState.session.presentationQueue[0].type, "ENVIRONMENT_EVENT");
+assert.equal(gameState.session.presentationQueue.length, 1);
+assert.equal(gameState.session.presentationQueue[0].type, "ENVIRONMENT_EVENT_MODAL");
 advancePresentation();
 assert.equal(gameState.session.presentation.eventId, "RAIN_START");
-advancePresentation();
 assert.equal(gameState.session.presentation.type, "ENVIRONMENT_EVENT_MODAL");
 assert.equal(advancePresentation(), false);
 acknowledgeEnvironmentEvent();
@@ -534,7 +533,7 @@ const fakeModal = {
 document.querySelector = selector => selector === "#environment-event-dialog" ? fakeModal : null;
 createNewGame();
 debugTriggerEvent(() => 0);
-const pendingModal = gameState.session.presentationQueue[0];
+const pendingModal = gameState.session.presentation;
 assert.equal(pendingModal.type, "ENVIRONMENT_EVENT_MODAL");
 assert.equal(pendingModal.title, "突然下大雨！");
 advancePresentation();
@@ -549,10 +548,10 @@ assert.equal(snapshot(), modalSnapshot);
 debugTriggerEvent(() => 0); // next event queues without replacing current modal
 assert.equal(gameState.session.presentation, pendingModal);
 assert.equal(acknowledgeEnvironmentEvent(), true);
-assert.equal(fakeModal.open, false);
+assert.equal(fakeModal.open, true);
 assert.equal(gameState.session.presentation.eventId, "RAIN_STOP");
 advancePresentation();
-assert.equal(modalOpens, 2);
+assert.equal(modalOpens, 1);
 const oldModal = gameState.session.presentation;
 createNewGame();
 assert.equal(fakeModal.open, false);
@@ -567,131 +566,151 @@ assert.equal(fakeModal.open, false);
 assert.equal(acknowledgeEnvironmentEvent(), false);
 clearActivityResultPresentation();
 document.querySelector = originalQuery;
-// Gameplay Flow Patch: shared predictions, lock, exhaustion and ordered ending.
-const { predictStallAction, isInteractionLocked, getExhaustionReason } = await import("../js/gameplay.js");
-const { acknowledgeEndGame, requestEndGame, enterSelectedStall } = await import("../js/game.js");
+// Gameplay Flow Revision: zero transitions notify, never end the night.
+const { predictStallAction, isInteractionLocked, getResourceZeroWarning } = await import("../js/gameplay.js");
+const { acknowledgeResourceWarning, requestEndGame, enterSelectedStall } = await import("../js/game.js");
 const freshFlow = () => { createNewGame({ buildId: "worker" }); gameState.progress.nextEventAt = 100; };
 for (const [stamina, rain, mosquito, expected] of [[10, false, false, 0], [15, true, false, 0], [15, false, true, 0], [16, false, true, 1]]) {
   freshFlow();
-  gameState.player.stamina = stamina;
-  gameState.environment.raining = rain;
-  gameState.environment.mosquito = mosquito;
+  Object.assign(gameState.player, { stamina });
+  Object.assign(gameState.environment, { raining: rain, mosquito });
   const prediction = predictStallAction(gameState, findStall("game_01"));
   assert.equal(prediction.stamina, expected);
-  assert.equal(prediction.warnings.length, expected === 0 ? 1 : 0);
+  assert.equal(Object.hasOwn(prediction, "warnings"), false);
   assert.ok(playTestGame("game_01", () => 0));
-  assert.equal(gameState.player.stamina, prediction.stamina);
+  assert.equal(gameState.player.stamina, expected);
+  advancePresentation();
   if (expected === 0) {
-    assert.equal(isInteractionLocked(gameState), true);
-    assert.equal(gameState.session.scene, "NIGHT_MARKET");
-    assert.equal(gameState.session.presentation.type, "ACTIVITY_RESULT");
+    assert.equal(gameState.session.presentation.title, "體力耗盡！");
+    assert.equal(advancePresentation(), false);
     const before = snapshot();
     assert.equal(buyFood("food_01"), false);
     assert.equal(snapshot(), before);
-    advancePresentation();
-    assert.equal(gameState.session.presentation.title, "眼前一黑");
-    assert.equal(gameState.session.endReason, "STAMINA_EXHAUSTED");
-    assert.equal(advancePresentation(), false);
-    assert.equal(acknowledgeEndGame(), true);
-    assert.equal(gameState.session.scene, "RESULT");
-    assert.equal(acknowledgeEndGame(), false);
-  }
+    acknowledgeResourceWarning();
+    assert.equal(gameState.session.scene, "NIGHT_MARKET");
+    assert.equal(gameState.session.endReason, null);
+    assert.equal(isInteractionLocked(gameState), false);
+    assert.equal(playTestGame("game_01"), false); // entry restriction still applies
+    assert.ok(buyFood("food_01"));
+    assert.ok(gameState.player.stamina > 0);
+    assert.equal(gameState.session.presentationQueue.length, 0);
+  } else assert.equal(gameState.session.presentation, null);
 }
 for (const [stamina, expected] of [[1, 11], [95, 95]]) {
   freshFlow();
   gameState.player.stamina = stamina;
   gameState.environment.mosquito = true;
-  const prediction = predictStallAction(gameState, findStall("food_01"));
-  assert.equal(prediction.stamina, expected);
-  assert.deepEqual(prediction.warnings, []);
+  assert.equal(predictStallAction(gameState, findStall("food_01")).stamina, expected);
   buyFood("food_01");
-  assert.equal(gameState.player.stamina, prediction.stamina);
+  assert.equal(gameState.player.stamina, expected);
 }
 for (const money of [119, 120, 121]) {
   freshFlow();
   gameState.environment.priceLevel = 2;
   gameState.player.money = money;
-  const prediction = predictStallAction(gameState, findStall("food_01"));
-  assert.equal(prediction.warnings.length, money <= 120 ? 1 : 0);
   const before = snapshot();
-  const applied = buyFood("food_01");
-  if (money === 119) {
-    assert.equal(applied, false);
-    assert.equal(snapshot(), before);
-    assert.equal(gameState.session.endReason, null);
-  } else {
-    assert.ok(applied);
-    assert.equal(gameState.player.money, prediction.money);
-    advancePresentation();
-    if (money === 120) {
-      assert.equal(gameState.session.presentation.title, "口袋比臉還乾淨");
-      assert.equal(gameState.session.endReason, "MONEY_EXHAUSTED");
-      acknowledgeEndGame();
-      assert.equal(gameState.session.scene, "RESULT");
-    } else assert.equal(gameState.session.presentation, null);
-  }
+  const result = buyFood("food_01");
+  if (money === 119) { assert.equal(result, false); assert.equal(snapshot(), before); continue; }
+  assert.ok(result);
+  advancePresentation();
+  if (money === 120) {
+    assert.equal(gameState.session.presentation.title, "身無分文！");
+    acknowledgeResourceWarning();
+    assert.equal(gameState.session.scene, "NIGHT_MARKET");
+    assert.equal(buyFood("food_01"), false);
+    assert.ok(playTestGame("game_01")); // money-free game is still legal
+    assert.ok(gameState.player.money > 0);
+  } else assert.equal(gameState.session.presentation, null);
 }
 freshFlow();
-assert.equal(getExhaustionReason({ stamina: -1, money: -1 }), "STAMINA_EXHAUSTED");
-const unfinishedBefore = snapshot();
+const beforeUnfinished = snapshot();
 applyActivityResult({ staminaDelta: -999, moneyDelta: -9999, completed: false });
-assert.equal(snapshot(), unfinishedBefore);
+assert.equal(snapshot(), beforeUnfinished);
 applyActivityResult({ staminaDelta: -999, moneyDelta: -9999 });
 assert.equal(gameState.player.stamina, 0);
 assert.equal(gameState.player.money, 0);
-assert.equal(gameState.session.presentation.reason, "STAMINA_EXHAUSTED");
+assert.equal(gameState.session.presentation.title, "又累又窮");
+assert.deepEqual(gameState.session.presentation.effectLines, ["❤️ 體力已歸零", "💰 金錢已歸零"]);
 assert.equal(gameState.session.presentationQueue.length, 0);
-assert.equal(requestEndGame("MONEY_EXHAUSTED"), false);
-acknowledgeEndGame();
-assert.equal(gameState.session.scene, "RESULT");
+acknowledgeResourceWarning();
+assert.equal(gameState.session.scene, "NIGHT_MARKET");
+applyActivityResult({ staminaDelta: 0, moneyDelta: 0 });
+assert.equal(gameState.session.presentation, null); // already zero: no repeat
+assert.equal(getResourceZeroWarning({ stamina: 0, money: 0 }, { stamina: 0, money: 0 }), null);
+applyActivityResult({ staminaDelta: 20, moneyDelta: 0 });
+assert.ok(playTestGame("game_01")); // money was already zero, does not warn
+assert.equal(gameState.session.presentationQueue.length, 0);
 
 freshFlow();
 gameState.player.stamina = 10;
 gameState.progress.nextEventAt = 1;
 playTestGame("game_01", () => 0);
-assert.equal(gameState.statistics.eventHistory.length, 1);
+assert.deepEqual(gameState.session.presentationQueue.map(p => p.type), ["ENVIRONMENT_EVENT_MODAL", "RESOURCE_WARNING_MODAL"]);
+const actionPresentation = gameState.session.presentation;
 assert.equal(isInteractionLocked(gameState), true);
-assert.deepEqual(gameState.session.presentationQueue.map(p => p.type), ["ENVIRONMENT_EVENT", "ENVIRONMENT_EVENT_MODAL", "EXHAUSTION_CHECK"]);
-for (const phase of ["ACTIVITY_RESULT", "ENVIRONMENT_EVENT", "ENVIRONMENT_EVENT_MODAL"]) {
-  assert.equal(gameState.session.presentation.type, phase);
-  const before = snapshot();
-  assert.equal(playTestGame("game_02"), false);
-  assert.equal(buyFood("food_01"), false);
-  assert.equal(enterSelectedStall(), false);
-  assert.equal(selectStallAndScroll("game_02"), false);
-  assert.equal(requestEndGame("HOME"), false);
-  assert.equal(snapshot(), before);
-  if (phase !== "ENVIRONMENT_EVENT_MODAL") advancePresentation();
-}
-assert.equal(gameState.session.endReason, null); // check waits for event acknowledgement
+assert.equal(enterSelectedStall(), false);
+advancePresentation();
+assert.equal(gameState.session.presentation.type, "ENVIRONMENT_EVENT_MODAL"); // exactly one advance, no Stage timer
+assert.equal(advancePresentation(actionPresentation), false);
+assert.equal(advancePresentation(), false);
 acknowledgeEnvironmentEvent();
-assert.equal(gameState.session.presentation.type, "END_REASON_MODAL");
-assert.equal(gameState.session.endReason, "STAMINA_EXHAUSTED");
-const endingPresentation = gameState.session.presentation;
-acknowledgeEndGame();
-assert.equal(gameState.session.scene, "RESULT");
-assert.equal(gameState.statistics.eventHistory.length, 1);
-freshFlow();
-assert.equal(advancePresentation(endingPresentation), false);
+assert.equal(gameState.session.presentation.type, "RESOURCE_WARNING_MODAL");
+assert.equal(isInteractionLocked(gameState), true);
+const staleWarning = gameState.session.presentation;
+acknowledgeResourceWarning();
+assert.equal(gameState.session.scene, "NIGHT_MARKET");
+assert.equal(gameState.session.presentation, null);
 assert.equal(isInteractionLocked(gameState), false);
-assert.equal(gameState.session.endReason, null);
-assert.equal(gameState.session.exhaustionPending, false);
+assert.equal(gameState.statistics.eventHistory.length, 1);
+assert.ok(buyFood("food_01"));
+freshFlow();
+assert.equal(advancePresentation(staleWarning), false);
+assert.equal(acknowledgeResourceWarning(), false);
 
 freshFlow();
 gameState.progress.nextEventAt = 1;
 playTestGame("game_01", () => 0);
-assert.equal(isInteractionLocked(gameState), true);
-advancePresentation(); advancePresentation();
-assert.equal(isInteractionLocked(gameState), true);
+advancePresentation();
 acknowledgeEnvironmentEvent();
+assert.equal(gameState.session.presentation, null); // option A: visual returns to environment immediately
 assert.equal(isInteractionLocked(gameState), false);
-assert.equal(gameState.session.presentation, null);
-assert.ok(playTestGame("game_02", () => 0));
+assert.ok(playTestGame("game_02"));
 clearActivityResultPresentation();
+assert.equal(requestEndGame("STAMINA_EXHAUSTED"), false);
+assert.equal(requestEndGame("MONEY_EXHAUSTED"), false);
 assert.equal(requestEndGame("HOME"), true);
-assert.equal(gameState.session.endReason, "HOME");
+assert.equal(gameState.session.scene, "RESULT");
 window.NMLDebug.changeScene("HOME");
 assert.equal(gameState.session.endReason, null);
+
+// New Game and HOME clear both pending notification kinds and stale callbacks.
+for (const cleanup of [() => createNewGame(), () => window.NMLDebug.changeScene("HOME")]) {
+  freshFlow();
+  gameState.player.stamina = 10;
+  gameState.progress.nextEventAt = 1;
+  playTestGame("game_01", () => 0);
+  const stale = gameState.session.presentation;
+  cleanup();
+  assert.deepEqual(gameState.session.presentationQueue, []);
+  assert.equal(gameState.session.presentation, null);
+  assert.equal(isInteractionLocked(gameState), false);
+  assert.equal(advancePresentation(stale), false);
+}
+const revisionHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+freshFlow();
+gameState.progress.nextEventAt = 4;
+playTestGame("game_01", () => 0);
+const replacedResult = gameState.session.presentation;
+for (let i = 0; i < 3; i += 1) playTestGame("game_01", () => 0);
+assert.equal(gameState.progress.actionCount, 4);
+assert.equal(gameState.session.presentationQueue.length, 1); // no old result backlog before event
+assert.equal(advancePresentation(replacedResult), false);
+advancePresentation();
+assert.equal(gameState.session.presentation.type, "ENVIRONMENT_EVENT_MODAL");
+acknowledgeEnvironmentEvent();
 assert.equal(isInteractionLocked(gameState), false);
+assert.ok(!revisionHtml.includes("data-entry-warning"));
+assert.ok(!revisionHtml.includes("end-reason-dialog"));
+assert.ok(revisionHtml.includes("resource-warning-dialog"));
 clearActivityResultPresentation();
 console.log("NightMarketLife core tests: PASS");
