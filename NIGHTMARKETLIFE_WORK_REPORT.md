@@ -655,3 +655,113 @@ UI、Statistics、Life 與 Presentation 都集中在 `playTestGame()` 的單一�
 Core tests 新增三組固定結果、連續 HUD 資源結果、actionCount、totalActions、per-stall gamePlays／stallVisits、Stall Life -1、Life 不低於 0、非 Game Stall 不執行、Presentation 不修改 Environment，以及 Presentation 不寫入 Storage 的驗證。並保留 HOME、Avatar、HOME → NIGHT_MARKET、HUD、Stall Grid、Closed／Influencer Blocked、Home Card、RESULT、Legacy Character Setup 與 Storage 既有回歸測試。
 
 本輪只完成 Step 4A Minimum Gameplay Loop；尚未開始 4B Food Gameplay、4C Entry／Life 關店規則或 4D Environment Event Trigger，也未建立不存在的 Technical Functional Spec。
+
+---
+
+# Step 4B+C：Food Gameplay + Entry Restriction + Stall Life Rules
+
+## Food Config 與 ActivityResult Flow
+
+保留正式名稱與 ID：food_01「測試小吃攤 A」、food_02「測試小吃攤 B」。`FOOD_CONFIG` 集中設定價格／恢復量分別為 100／15、200／30，建立 Stall Model 時帶入 price 與 staminaRecovery。Food Modal 顯示名稱、狀態、價格、恢復量與購買按鈕；主畫面 Card 仍只顯示名稱＋狀態。
+
+`buyFood(stallId)` 先檢查 Closed／Blocked 與金錢，再產生 completed ActivityResult，經 normalize/apply 更新資源及 Action。滿體力仍可購買，恢復沿用既有 maxStamina clamp。不套用 priceLevel 或任何 Environment Recovery Modifier。
+
+## Actual Applied Delta 與 Food Result Presentation
+
+`applyActivityResult()` 保留既有 normalized 回傳欄位，額外回傳 `appliedDeltas`，由套用前後 stamina／money／score 差值計算；未修改輸入 Schema 或 External Wrapper 的呼叫方式。共用 Animation Stage Presentation 優先使用實際差值。90/100 購買 +15 時顯示 +10，滿體力購買時只顯示扣款；零差值略過。Food 標題為「攤位名稱 補充完成！」，Game 三組既有結果不變。演出仍由原本 2.4 秒 Timer 還原 Environment，不觸發事件。
+
+## Food Statistics
+
+沿用原 Schema：`statistics.foodPurchases` 是數字，每次成功 +1；`stallVisits[stallId]` +1。actionCount／totalActions 只由 ActivityResult +1，不重複累加。Game 仍更新原本 per-stall gamePlays。
+
+## Entry Restriction 與 Failure Message Pool
+
+`getStallEntryFailure()` 集中檢查：Closed／Influencer Blocked 優先於資源限制；Game 的 stamina < staminaCost 禁止，Food 的 money < price 禁止，剛好相等允許。正式 UI 與 NMLDebug.playTestGame／buyFood 使用相同路徑。
+
+`config.js` 集中 LOW_STAMINA_MESSAGES 與 NO_MONEY_MESSAGES，各 8 句；`pickRandomMessage(messages, randomFn)` 可注入固定亂數供測試。失敗使用小型原生 dialog 呈現大字內心戲，下方 muted 顯示目前值與需求值。未使用 alert、console-only 或新增 Event 系統。失敗不套用 ActivityResult、不增加 Action／Statistics、不扣 Life、不修改 Environment，也不寫 LocalStorage。
+
+## Stall Life、Auto Close 與 Status Priority
+
+成功 Game／Food 經 `consumeStallLife()` 扣 1，最低為 0；`syncStallClosure()` 將一般攤位 life <= 0 同步為既有 isClosed=true，並在 Status 讀取時處理 Debug 調整後的狀態。沒有第二套 Closed State。Special Management／Clothing 不扣一般 Life，不會因 null／0 Life 自動收攤，仍維持 Placeholder。
+
+Status Priority 為 CLOSED > INFLUENCER_BLOCKED > OPEN；Closed 與 Blocked 同時存在時，Card 顯示「今日公休」且不套用 Blocked Highlight。Life 始終不顯示在 Card 或 Modal。
+
+## Tests 與 Regression
+
+完整 `tests/core.test.mjs`：**NightMarketLife core tests: PASS**。
+
+新增／更新驗證涵蓋：兩種 Food 價格與恢復、90+15 clamp 與 Presentation +10、滿體力購買、Food Statistics／Visits／Action／Life、體力 9 拒絕及 10 允許、金錢 99 拒絕及 100 允許、失敗前後完整資源／Progress／Statistics／Stalls／Environment 快照相等、LocalStorage 寫入次數不變、兩種攤位 Life 1→0→Closed、再次行動拒絕、Life 下限、Closed 優先權、Special Stall 例外、可預測文案抽取、數值說明。成功行動超過 nextEventAt 仍保持 nextEventAt 與 Environment 不變。
+
+既有 Step 1～4A 測試保留，只有「Life=0 仍可遊玩」的舊 Step 4A 暫行期待改為本輪正式拒絕規則。HOME／Avatar／Legacy Character Setup／Storage／RESULT 結構未重寫。
+
+## Browser / Responsive
+
+- 實際從 HOME 開始，Game A 後 Food A：HUD 100/100、20 分、950 元，Animation Stage 顯示「❤️ +10　💰 -100」：PASS。
+- 滿體力連續購買 Food B 仍扣款；餘款 150 嘗試購買 200 時顯示隨機內心戲及「目前金錢 150　需要 200」：PASS。
+- 連續正常遊玩至 stamina=0，再嘗試 Game C 顯示隨機內心戲及「目前體力 0　需要 10」：PASS。
+- Food Modal 與金錢不足 Modal 在 320×844、390×844、390×900、430×932 皆無水平 Overflow，Modal 全部位於可視範圍內。
+- 瀏覽器 Console 檢查無 Error／Warning。精確 9／99 與 Life 1 邊界由上述核心測試驗證。
+
+## Scope / Git
+
+尚未開始 Step 4D：沒有 Environment Event Trigger、重抽 nextEventAt、環境資源效果或 Influencer Lifecycle。未新增 Stall、Equipment、正式 Clothing／Management、Achievement、Settlement、iframe／postMessage 或外部遊戲串接。不存在的 Technical Spec 未建立，只更新本報告。完成後只檢查 Git status／diff，不 Commit、不 Push。
+
+---
+
+# Step 4D：Environment Event Trigger + Environment Gameplay
+
+## Event Trigger / nextEventAt Strategy
+
+成功 Game／Food 的完成順序統一為 ActivityResult（含本次蚊子效果）→ Statistics → Stall Life／Auto Close → Influencer Move → Event Trigger Check → Presentation。只有成功行動會呼叫完成流程，失敗與取消不推進事件。`nextEventAt` 使用絕對 actionCount；達標每次只觸發一筆，下一門檻為目前 actionCount + 隨機 4～6，不重設成單純 4～6。初始化與後續間隔共用可注入 randomFn 的 `getNextEventInterval()`。
+
+## Event Pool / Eligibility / History
+
+`events.js` 集中 RAIN_START／STOP、MOSQUITO_START／STOP、INFLUENCER、CROWD_UP／DOWN、PRICE_UP／DOWN、REWARD_UP／DOWN，依 Boolean 與 Level 邊界過濾。雨或蚊子已存在時不重複啟動，不存在時不抽 STOP；網紅存在時不抽第二個 INFLUENCER。每次事件在 `statistics.eventHistory` 新增 eventId、actionCount 及必要的 delta／level／targetStallId，不儲存巨大快照。
+
+## Rain / Mosquito Lifecycle
+
+Rain／Mosquito 持續到反向事件，不使用 Timer 自動解除。Timer 僅控制畫面演出。Environment Boolean 保持唯一 Gameplay 來源；`activeEvents` 原本是空陣列 Skeleton，本輪保留原狀，沒有新增互相衝突的狀態。
+
+## Influencer Lifecycle / Movement
+
+網紅啟動時從未關閉且 Life > 0 的一般 Game／Food 攤位抽目標；排除 Special、Home。每次成功 Action 在 Life 結算後最多移動一次，有多個合法目標時排除原目標；只剩一個可留在同攤，無合法目標時 blocked ID=null，influencer Boolean 可繼續存在。
+
+網紅只在下一次 Environment Event 開始時判斷離開，Config `influencerLeaveChance=0.5`。離開時清空 Boolean／blocked ID，記錄 INFLUENCER_LEAVE 並占用該次事件名額；未離開仍抽一般事件，不取消事件，也不重新啟動網紅。
+
+## Crowd / Price / Reward Level
+
+Crowd 使用 1～5；Price 使用現有倍率陣列索引 0～3（0.9／1／1.2／1.4）；Reward 使用索引 0～4（0.8／1／1.2／1.5／2）。Level 事件隨機 ±1／±2 並 Clamp，達邊界的同方向事件不加入 Pool。Crowd 只改 State／Presentation，不耦合 Gameplay Cost、Food Recovery、Life 或倍率。
+
+## Gameplay Modifiers / Effective Cost
+
+- `getEffectiveGameStaminaCost()`：Game Base Cost 加下雨 +5（Config `rainGameStaminaPenalty`），Modal、Entry Restriction 與扣款流程讀同一 Helper。Food 不受雨的額外體力消耗影響。
+- `getEffectiveFoodPrice()`：Base Price × Price Multiplier，Math.round；Food Modal、金錢檢查與 ActivityResult 付款使用相同價格。
+- `applyRewardModifier()`：只調整 Game 正數 moneyDelta／scoreDelta 並 Math.round，負值不放大；不影響 Food Recovery。
+- Mosquito：成功行動套用 Base／Rain／Recovery 的 clamp 後，再扣 Config `mosquitoStaminaPenalty=5`，最低 0；不是 Entry Cost，且只增加一次 mosquitoActions。滿體力吃食物時先恢復至上限再被扣 5。回傳 appliedDeltas 與 Presentation 使用整次行動前後差值，不拆成兩段動畫。
+- 本次行動使用行動開始時的環境，行動結束新觸發的環境從下一次行動起生效。
+
+## Presentation Queue / Stage
+
+新增 session.presentationQueue，採 FIFO；同一次 Action 先排 ACTIVITY_RESULT，再排 ENVIRONMENT_EVENT，各約 2.4 秒，最後回 Environment Status。連續操作也不丟棄已排入的結果或事件。CSS Layer 在狀態改變後立即更新；事件文字沿用既有舞台，沒有重做版型。New Game／HOME 開始會清 Timer，resetGameState 清 presentation／queue；Timer callback 保留 identity guard，避免舊局 callback 影響新局。Presentation 不存 LocalStorage。
+
+## Debug
+
+保留原 setRain、setMosquito、setInfluencer、closeStall、openStall、render、playTestGame、buyFood。新增 `NMLDebug.triggerEnvironmentEvent()`，走正式事件抽選、離開判斷、History、nextEventAt 與 Queue 流程；Debug 強制触發不增加 Action。playTestGame／buyFood 及底層事件 Helper 可注入 randomFn 供固定測試，未建立第二套 Debug 資源規則。
+
+## Tests / Regression
+
+完整核心測試結果：**NightMarketLife core tests: PASS**。
+
+固定亂數測試涵蓋：初始與新間隔 4／5／6、未達門檻不觸發、達標一次、绝對下一門檻、雨／蚊子雙向 Eligibility、Level ±1／±2 與全部上下限、網紅合法目標與不同攤移動、單一／無目標、事件時離開或留下、每次成功僅移動一次、Event History、雨天體力 14 拒絕／15 允許、Food 不加雨 Cost、蚊子 Game -15 與 10 體力仍可進入、失敗零副作用、滿體力 Food 蚊子後為 95、Price 120 的 119 拒絕／120 允許、Reward +24／+60 與四捨五入、负值不放大、Food Recovery 不受 Reward、同次結果→事件→環境順序、新局 Queue 清空與舊 callback 無效、事件影響下一次而非當次行動。
+
+原 Step 1～4B+C 測試保留；Food 基礎數值測試隔離在事件門檻前，淘汰上一輪「超過門檻仍不觸發事件」的暫行期待。Avatar／HOME／Legacy／Storage 等既有回歸測試保留，沒有改其 Schema 或流程。
+
+## Browser / Responsive
+
+實際 HOME → NIGHT_MARKET 連續遊玩及 Food 成功後，已觀察 Activity Result →「夜市新鮮事」環境事件演出。捕捉到 REWARD_DOWN「今天的運氣似乎請假了。」；320×844、390×844、390×900、430×932 均無水平 Overflow，事件文字位於舞台內。定量雨／蚊子／Price／Reward／網紅與長文 Pool 內容由核心測試及來源檢查驗證。
+
+初次沿用舊本機來源時遇到快取 events.js，造成缺少新 export；改用全新本機來源後成功載入並完成上述驗證。此為測試快取現象，未透過刪除 Storage 解決。
+
+## 完成範圍
+
+**Step 4 Gameplay Loop 已完成。** 本輪未新增 Equipment、正式 Clothing／Management、Achievement Conditions、正式 Settlement、Opening Event、排行榜／PK、後端、新 Stall 或外部遊戲通訊。不存在的 Technical Spec 不建立；本次只更新 Work Report。保留所有先前未提交修改，完成後檢查 git status／diff，不 Commit、不 Push，等待實機確認。

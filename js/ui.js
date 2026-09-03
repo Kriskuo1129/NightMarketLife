@@ -3,6 +3,7 @@ import { CONFIG, getBuildById } from "./config.js";
 import { getAppearanceView } from "./character-setup.js";
 import { renderAllCharacters } from "./character-renderer.js";
 import { getStallDisplayStatus } from "./stalls.js";
+import { getEffectiveFoodPrice, getEffectiveGameStaminaCost } from "./events.js";
 
 export const SCENES = Object.freeze({ HOME: "HOME", CHARACTER_SETUP: "CHARACTER_SETUP", NIGHT_MARKET: "NIGHT_MARKET", RESULT: "RESULT" });
 
@@ -106,7 +107,8 @@ function renderEnvironmentStage(gameState) {
   const presentation = gameState.session.presentation;
   const view = getEnvironmentStageView(gameState.environment);
   const showingResult = presentation?.type === "ACTIVITY_RESULT";
-  stage.dataset.presentation = showingResult ? "activity-result" : "environment";
+  const showingEvent = presentation?.type === "ENVIRONMENT_EVENT";
+  stage.dataset.presentation = showingResult ? "activity-result" : showingEvent ? "environment-event" : "environment";
   stage.dataset.environmentStage = view.code;
   stage.dataset.raining = String(view.raining);
   stage.dataset.mosquito = String(view.mosquito);
@@ -115,11 +117,12 @@ function renderEnvironmentStage(gameState) {
   const kicker = stage.querySelector("[data-stage-kicker]");
   const message = stage.querySelector("[data-environment-message]");
   const result = stage.querySelector("[data-activity-result]");
-  if (kicker) kicker.textContent = showingResult ? "挑戰結果" : "今晚的夜市";
-  if (message) message.textContent = showingResult ? presentation.title : view.message;
+  if (kicker) kicker.textContent = showingResult ? "挑戰結果" : showingEvent ? "夜市新鮮事" : "今晚的夜市";
+  if (message) message.textContent = showingResult || showingEvent ? presentation.title : view.message;
   if (result) {
     result.hidden = !showingResult;
-    if (showingResult) result.textContent = `❤️ ${formatSignedDelta(presentation.staminaDelta)}　⭐ ${formatSignedDelta(presentation.scoreDelta)}　💰 ${formatSignedDelta(presentation.moneyDelta)}`;
+    if (showingResult) result.textContent = [["❤️", presentation.staminaDelta], ["⭐", presentation.scoreDelta], ["💰", presentation.moneyDelta]]
+      .filter(([, delta]) => delta !== 0).map(([icon, delta]) => `${icon} ${formatSignedDelta(delta)}`).join("　");
   }
 }
 
@@ -192,7 +195,7 @@ export function renderNightMarket(gameState) {
     const stall = gameState.stalls.find((item) => item.id === card.dataset.stallId);
     const view = getStallDisplayStatus(stall, gameState.environment);
     card.classList.toggle("stall-card--closed", view.isClosed);
-    card.classList.toggle("stall-card--blocked", view.isBlocked);
+    card.classList.toggle("stall-card--blocked", view.isBlocked && !view.isClosed);
     card.querySelector(".stall-card-name").textContent = stall.name;
     card.querySelector(".stall-card-status").textContent = view.label;
     card.setAttribute("aria-label", stall.name + "，" + view.label);
@@ -204,7 +207,9 @@ export function renderNightMarket(gameState) {
     name: stall.name,
     status: view.label,
     reason: view.canEnter ? "" : view.notice,
-    stamina: stall.type === "GAME" ? `❤️ 體力 ${stall.staminaCost}` : ""
+    stamina: stall.type === "GAME" ? `❤️ 體力 ${getEffectiveGameStaminaCost(stall, gameState.environment)}` : "",
+    price: `💰 ${getEffectiveFoodPrice(stall, gameState.environment)}`,
+    recovery: `❤️ +${stall.staminaRecovery}`
   };
   document.querySelectorAll("[data-selected-stall]").forEach((element) => {
     element.textContent = selectedValues[element.dataset.selectedStall] ?? "";
@@ -213,6 +218,10 @@ export function renderNightMarket(gameState) {
   if (reason) reason.hidden = view.canEnter;
   const stamina = document.querySelector('[data-selected-stall="stamina"]');
   if (stamina) stamina.closest(".stall-entry-cost").hidden = stall.type !== "GAME";
+  document.querySelectorAll("[data-food-info]").forEach((element) => { element.hidden = stall.type !== "FOOD"; });
   const enterButton = document.querySelector('#stall-detail-dialog [data-action="enter-stall"]');
-  if (enterButton) enterButton.disabled = !view.canEnter;
+  if (enterButton) {
+    enterButton.disabled = !view.canEnter;
+    enterButton.textContent = stall.type === "FOOD" ? "購買" : "前往攤位";
+  }
 }

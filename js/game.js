@@ -1,12 +1,13 @@
-import { CONFIG, getBuildById } from "./config.js";
+import { CONFIG, getBuildById, LOW_STAMINA_MESSAGES, NO_MONEY_MESSAGES, pickRandomMessage } from "./config.js";
 import { gameState, resetGameState } from "./state.js";
 import { clearCharacterSettings, loadCharacterSettings, saveCharacterSettings } from "./storage.js";
 import { SCENES, changeScene, getSelectedStall, render, renderBuildOptions, scrollSelectedStallIntoView, selectStall, setStatus } from "./ui.js";
-import { getStallDisplayStatus, STALL_CONFIG, STALL_TYPES, TEST_GAME_RESULTS } from "./stalls.js";
+import { consumeStallLife, FOOD_CONFIG, getStallDisplayStatus, STALL_CONFIG, STALL_TYPES, TEST_GAME_RESULTS } from "./stalls.js";
 import { applyBuildToPlayer } from "./character.js";
 import { changeClothes, changeFace, setCustomAppearance } from "./character-setup.js";
 import { processCustomClothesImage, processCustomFaceImage } from "./uploads.js";
 import { DEFAULT_CLOTHES, FACE_ASSETS, SHOP_CLOTHES } from "../assets/character-assets.js";
+import { applyRewardModifier, checkEnvironmentEvent, EVENT_MESSAGES, getEffectiveFoodPrice, getEffectiveGameStaminaCost, moveInfluencer, triggerEnvironmentEvent as triggerEvent } from "./events.js";
 
 export function normalizeActivityResult(result = {}) {
   return {
@@ -19,21 +20,30 @@ export function normalizeActivityResult(result = {}) {
   };
 }
 
-export function applyActivityResult(result) {
+export function applyActivityResult(result, { mosquito = false } = {}) {
   const activity = normalizeActivityResult(result);
   if (![activity.staminaDelta, activity.moneyDelta, activity.scoreDelta, activity.progressCost].every(Number.isFinite)) {
     throw new TypeError("ActivityResult numeric fields must be finite numbers.");
   }
   if (!activity.completed) return activity;
   const player = gameState.player;
+  const before = { stamina: player.stamina, money: player.money, score: player.score };
   player.stamina = Math.min(player.maxStamina, Math.max(0, player.stamina + activity.staminaDelta));
+  if (mosquito) {
+    player.stamina = Math.max(0, player.stamina - CONFIG.mosquitoStaminaPenalty);
+    gameState.statistics.mosquitoActions += 1;
+  }
   player.money += activity.moneyDelta;
   player.score += activity.scoreDelta;
   gameState.progress.actionCount += activity.progressCost;
   gameState.statistics.totalActions += activity.progressCost;
   gameState.session.lastActivitySourceId = activity.sourceId || null;
   render(gameState);
-  return activity;
+  return { ...activity, appliedDeltas: {
+    staminaDelta: player.stamina - before.stamina,
+    moneyDelta: player.money - before.money,
+    scoreDelta: player.score - before.score
+  } };
 }
 
 export const handleExternalGameResult = (result) => applyActivityResult(result);
@@ -45,37 +55,109 @@ export function clearActivityResultPresentation(presentation = gameState.session
   if (presentation && gameState.session.presentation !== presentation) return false;
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   gameState.session.presentation = null;
+  gameState.session.presentationQueue = [];
   activityPresentationTimer = null;
   render(gameState);
   return true;
 }
 
 export function showActivityResultPresentation(stall, activity) {
-  if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   const presentation = {
     type: "ACTIVITY_RESULT",
-    title: `${stall.name} 挑戰完成！`,
-    staminaDelta: activity.staminaDelta,
-    scoreDelta: activity.scoreDelta,
-    moneyDelta: activity.moneyDelta
+    title: `${stall.name} ${stall.type === STALL_TYPES.FOOD ? "補充完成" : "挑戰完成"}！`,
+    staminaDelta: (activity.appliedDeltas ?? activity).staminaDelta,
+    scoreDelta: (activity.appliedDeltas ?? activity).scoreDelta,
+    moneyDelta: (activity.appliedDeltas ?? activity).moneyDelta
   };
-  gameState.session.presentation = presentation;
-  render(gameState);
-  activityPresentationTimer = setTimeout(() => clearActivityResultPresentation(presentation), ACTIVITY_PRESENTATION_DURATION);
-  activityPresentationTimer?.unref?.();
+  enqueuePresentation(presentation);
   return presentation;
 }
 
-export function playTestGame(stallId) {
+function enqueuePresentation(presentation) {
+  gameState.session.presentationQueue.push(presentation);
+  if (!gameState.session.presentation) advancePresentation();
+}
+
+export function advancePresentation(expected = gameState.session.presentation) {
+  if (expected !== gameState.session.presentation) return false;
+  if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
+  const presentation = gameState.session.presentationQueue.shift() ?? null;
+  gameState.session.presentation = presentation;
+  activityPresentationTimer = null;
+  if (presentation) {
+    activityPresentationTimer = setTimeout(() => advancePresentation(presentation), ACTIVITY_PRESENTATION_DURATION);
+    activityPresentationTimer?.unref?.();
+  }
+  render(gameState);
+  return true;
+}
+
+function presentEvent(event) {
+  if (event) enqueuePresentation({ type: "ENVIRONMENT_EVENT", eventId: event.eventId, title: EVENT_MESSAGES[event.eventId] });
+}
+
+export function triggerEnvironmentEvent(randomFn = Math.random) {
+  const event = triggerEvent(gameState, randomFn);
+  presentEvent(event);
+  render(gameState);
+  return event;
+}
+
+function completeStallAction(stall, activity, randomFn) {
+  consumeStallLife(stall);
+  moveInfluencer(gameState, randomFn);
+  const event = checkEnvironmentEvent(gameState, randomFn);
+  showActivityResultPresentation(stall, activity);
+  presentEvent(event);
+  render(gameState);
+}
+
+export function playTestGame(stallId, randomFn = Math.random) {
   const stall = gameState.stalls.find((item) => item.id === stallId);
   const result = TEST_GAME_RESULTS[stallId];
   if (!stall || stall.type !== STALL_TYPES.GAME || !result) return false;
-  if (!getStallDisplayStatus(stall, gameState.environment).canEnter) return false;
-  const activity = applyActivityResult(result);
+  const failure = getStallEntryFailure(stall);
+  if (failure) { showEntryFailure(failure); return false; }
+  const environment = gameState.environment;
+  const activity = applyActivityResult(applyRewardModifier({ ...result, staminaDelta: -getEffectiveGameStaminaCost(stall, environment) }, environment), { mosquito: environment.mosquito });
   gameState.statistics.gamePlays[stall.id] = (gameState.statistics.gamePlays[stall.id] ?? 0) + 1;
   gameState.statistics.stallVisits[stall.id] = (gameState.statistics.stallVisits[stall.id] ?? 0) + 1;
-  stall.life = Math.max(0, stall.life - 1);
-  showActivityResultPresentation(stall, activity);
+  completeStallAction(stall, activity, randomFn);
+  return activity;
+}
+
+export function getStallEntryFailure(stall, randomFn = Math.random) {
+  const status = getStallDisplayStatus(stall, gameState.environment);
+  if (!status?.canEnter) return { code: status?.code ?? "UNAVAILABLE", message: status?.label ?? "老闆還沒準備好。", detail: status?.notice ?? "" };
+  const cost = getEffectiveGameStaminaCost(stall, gameState.environment);
+  const price = getEffectiveFoodPrice(stall, gameState.environment);
+  if (stall.type === STALL_TYPES.GAME && gameState.player.stamina < cost) {
+    return { code: "LOW_STAMINA", message: pickRandomMessage(LOW_STAMINA_MESSAGES, randomFn), current: gameState.player.stamina, required: cost, detail: `❤️ 目前體力 ${gameState.player.stamina}　需要 ${cost}` };
+  }
+  if (stall.type === STALL_TYPES.FOOD && gameState.player.money < price) {
+    return { code: "NO_MONEY", message: pickRandomMessage(NO_MONEY_MESSAGES, randomFn), current: gameState.player.money, required: price, detail: `💰 目前金錢 ${gameState.player.money}　需要 ${price}` };
+  }
+  return null;
+}
+
+function showEntryFailure(failure) {
+  document.querySelector("#stall-detail-dialog")?.close();
+  const dialog = document.querySelector("#entry-failure-dialog");
+  if (!dialog) return;
+  dialog.querySelector("[data-failure-message]").textContent = failure.message;
+  dialog.querySelector("[data-failure-detail]").textContent = failure.detail;
+  dialog.showModal();
+}
+
+export function buyFood(stallId, randomFn = Math.random) {
+  const stall = gameState.stalls.find((item) => item.id === stallId);
+  if (!stall || stall.type !== STALL_TYPES.FOOD || !FOOD_CONFIG[stallId]) return false;
+  const failure = getStallEntryFailure(stall);
+  if (failure) { showEntryFailure(failure); return false; }
+  const activity = applyActivityResult({ staminaDelta: stall.staminaRecovery, moneyDelta: -getEffectiveFoodPrice(stall, gameState.environment), scoreDelta: 0, completed: true, progressCost: 1, sourceId: stall.id }, { mosquito: gameState.environment.mosquito });
+  gameState.statistics.foodPurchases += 1;
+  gameState.statistics.stallVisits[stall.id] = (gameState.statistics.stallVisits[stall.id] ?? 0) + 1;
+  completeStallAction(stall, activity, randomFn);
   return activity;
 }
 
@@ -211,6 +293,12 @@ export function showSelectedStallPlaceholder() {
 
 export function enterSelectedStall() {
   const stall = getSelectedStall(gameState);
+  const failure = getStallEntryFailure(stall);
+  if (failure) { showEntryFailure(failure); return false; }
+  if (stall?.type === STALL_TYPES.FOOD) {
+    document.querySelector("#stall-detail-dialog")?.close();
+    return buyFood(stall.id);
+  }
   if (stall?.type === STALL_TYPES.GAME && TEST_GAME_RESULTS[stall.id]) {
     document.querySelector("#stall-detail-dialog")?.close();
     return playTestGame(stall.id);
@@ -275,6 +363,8 @@ window.NMLDebug = Object.freeze({
   applyActivityResult,
   handleExternalGameResult,
   playTestGame,
+  buyFood,
+  triggerEnvironmentEvent,
   changeScene: (scene) => changeScene(gameState, scene),
   selectStall: selectStallAndScroll,
   closeStall: (id) => setStallClosed(id, true),

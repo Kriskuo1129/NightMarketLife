@@ -1,14 +1,10 @@
-import { CONFIG } from "./config.js";
 import { createPlayer } from "./character.js";
-import { createEnvironment, createActiveEvents } from "./events.js";
+import { createEnvironment, createActiveEvents, getNextEventInterval } from "./events.js";
 import { createInitialAchievements } from "./achievements.js";
 import { createInitialStalls } from "./stalls.js";
 
-const randomInteger = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-
-export function createProgress() {
-  const { min, max } = CONFIG.environmentEventInterval;
-  return { actionCount: 0, nextEventAt: randomInteger(min, max) };
+export function createProgress(randomFn = Math.random) {
+  return { actionCount: 0, nextEventAt: getNextEventInterval(randomFn) };
 }
 
 export function createStatistics() {
@@ -25,7 +21,7 @@ export function createGameState(characterSettings = {}) {
     activeEvents: createActiveEvents(),
     statistics: createStatistics(),
     achievements: createInitialAchievements(),
-    session: { scene: "HOME", lastActivitySourceId: null, selectedStallId: stalls[0]?.id ?? null, presentation: null }
+    session: { scene: "HOME", lastActivitySourceId: null, selectedStallId: stalls[0]?.id ?? null, presentation: null, presentationQueue: [] }
   };
 }
 

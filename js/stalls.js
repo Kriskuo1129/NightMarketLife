@@ -20,6 +20,11 @@ export const TEST_GAME_RESULTS = Object.freeze({
   game_03: Object.freeze({ staminaDelta: -10, scoreDelta: 30, moneyDelta: 20, completed: true, progressCost: 1, sourceId: "game_03" })
 });
 
+export const FOOD_CONFIG = Object.freeze({
+  food_01: Object.freeze({ price: 100, staminaRecovery: 15 }),
+  food_02: Object.freeze({ price: 200, staminaRecovery: 30 })
+});
+
 const randomInteger = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 export function createStall(definition) {
@@ -36,7 +41,8 @@ export function createStall(definition) {
     life: maxLife,
     isClosed: false,
     isBlocked: false,
-    price: definition.price ?? 0,
+    price: definition.price ?? FOOD_CONFIG[definition.id]?.price ?? 0,
+    staminaRecovery: definition.staminaRecovery ?? FOOD_CONFIG[definition.id]?.staminaRecovery ?? 0,
     staminaCost: definition.staminaCost ?? 0,
     interactionType: definition.interactionType
   };
@@ -52,6 +58,7 @@ export const STALL_DISPLAY_STATUS = Object.freeze({
 
 export function getStallDisplayStatus(stall, environment) {
   if (!stall) return null;
+  syncStallClosure(stall);
   const isBlocked = Boolean(stall.isBlocked || stall.id === environment.influencerBlockedStallId);
   const code = stall.isClosed
     ? STALL_DISPLAY_STATUS.CLOSED
@@ -73,6 +80,19 @@ export function getStallDisplayStatus(stall, environment) {
     notice: stall.isClosed ? "今天休攤。" : isBlocked ? "網紅正在拍攝，暫時無法進入。" : "",
     lifeText: stall.isSpecial ? null : "剩餘：" + stall.life
   };
+}
+
+export function syncStallClosure(stall) {
+  if (!stall.isSpecial && Number.isFinite(stall.life) && stall.life <= 0) {
+    stall.life = 0;
+    stall.isClosed = true;
+  }
+}
+
+export function consumeStallLife(stall) {
+  if (stall.isSpecial) return;
+  stall.life = Math.max(0, stall.life - 1);
+  syncStallClosure(stall);
 }
 
 // Step 3 compatibility alias. New UI code uses getStallDisplayStatus().

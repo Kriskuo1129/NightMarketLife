@@ -1,5 +1,8 @@
 :root { color-scheme:dark; font-family:system-ui,"Noto Sans TC",sans-serif; color:#fff4dc; background:#17110f; --paper:#fff0cf; --ink:#38241b; --red:#a63f32; --red-dark:#7d2d25; --gold:#f2b94b; --night:#17110f; --panel:#2b1b17; --line:#714b36; --nml-bg:#17110f; --nml-surface:#2b1b17; --nml-surface-dark:#1b1110; --nml-border:#714b36; --nml-gold:#f2b94b; --nml-orange:#d3833b; --nml-text:#fff4dc; --nml-muted:#d9bb91; }
 * { box-sizing: border-box; }
+.failure-message { font-size:1.2rem; line-height:1.6; overflow-wrap:anywhere; }
+.failure-detail { color:#cdbba4; font-size:.85rem; line-height:1.6; overflow-wrap:anywhere; }
+#entry-failure-dialog { max-height:calc(100dvh - 2rem); overflow-y:auto; }
 html,body { min-height:100%; }
 body { margin:0; min-height:100dvh; overflow-x:hidden; background:radial-gradient(circle at 50% -8rem,#593023 0,var(--nml-bg) 34rem); }
 button,input { font:inherit; } button { min-height:44px; cursor:pointer; }
