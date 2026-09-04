@@ -19,7 +19,6 @@ export function createPlayer(settings = {}) {
     stamina: build.stamina,
     maxStamina: build.stamina,
     money: build.money,
-    score: 0,
     appearance,
     inventory: { ownedClothes: [] },
     // Step 1 aliases remain available while new code uses appearance.

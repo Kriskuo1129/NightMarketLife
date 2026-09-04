@@ -15,9 +15,9 @@ export const STALL_CONFIG = Object.freeze([
 ]);
 
 export const TEST_GAME_RESULTS = Object.freeze({
-  game_01: Object.freeze({ staminaDelta: -10, scoreDelta: 20, moneyDelta: 50, completed: true, progressCost: 1, sourceId: "game_01" }),
-  game_02: Object.freeze({ staminaDelta: -10, scoreDelta: 10, moneyDelta: 100, completed: true, progressCost: 1, sourceId: "game_02" }),
-  game_03: Object.freeze({ staminaDelta: -10, scoreDelta: 30, moneyDelta: 20, completed: true, progressCost: 1, sourceId: "game_03" })
+  game_01: Object.freeze({ staminaDelta: -10, moneyDelta: 50, completed: true, progressCost: 1, sourceId: "game_01" }),
+  game_02: Object.freeze({ staminaDelta: -10, moneyDelta: 100, completed: true, progressCost: 1, sourceId: "game_02" }),
+  game_03: Object.freeze({ staminaDelta: -10, moneyDelta: 20, completed: true, progressCost: 1, sourceId: "game_03" })
 });
 
 export const FOOD_CONFIG = Object.freeze({

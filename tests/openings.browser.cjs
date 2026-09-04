@@ -43,7 +43,8 @@ const os = require('node:os');
     assert.ok(await home.locator('[data-avatar-image]').isVisible());
     await start(.75);
     let s=await state();
-    assert.deepEqual([s.player.stamina,s.player.maxStamina,s.player.money,s.player.score],[110,110,800,0]);
+    assert.deepEqual([s.player.stamina,s.player.maxStamina,s.player.money],[110,110,800]);
+    assert.equal(s.session.startingMoney,800);
     assert.equal(s.session.openingConditionId,'ANNIVERSARY');
     assert.deepEqual([s.environment.crowdLevel,s.environment.priceLevel,s.environment.rewardLevel],[4,0,2]);
     assert.equal(s.progress.actionCount,0); assert.equal(s.statistics.totalActions,0);
@@ -67,7 +68,7 @@ const os = require('node:os');
       await page.locator('[data-action="enter-stall"]').click();
       await page.evaluate(async()=>{(await import('/js/game.js?v=core-ui-stall-grid')).clearActivityResultPresentation();});
     }
-    s=await state(); assert.equal(s.player.score,24); assert.equal(s.player.money,770);
+    s=await state(); assert.equal(s.player.money,770);
     await page.evaluate(()=>window.NMLDebug.triggerEnvironmentEvent(()=>0));
     assert.equal((await state()).environment.raining,false);
     await page.locator('[data-action="acknowledge-event"]').click();
@@ -81,14 +82,14 @@ const os = require('node:os');
     assert.equal((await state()).session.openingConditionId,null);
     assert.equal(await home.locator('[data-home-build="name"]').innerText(),'大學生');
     await start(.99); assert.equal((await state()).session.openingConditionId,'BUSY_MARKET');
-    assert.deepEqual([(await state()).player.stamina,(await state()).player.money,(await state()).player.score],[110,800,0]);
+    assert.deepEqual([(await state()).player.stamina,(await state()).player.money],[110,800]);
     await acknowledge();
 
     for(const [id,stamina,money] of [['high-school',120,600],['college',110,800],['worker',100,1000],['middle-aged',85,1300],['senior',70,1600]]) {
       await page.evaluate(()=>window.NMLDebug.changeScene('HOME'));
       await choose(id); await start(.1);
       const player=(await state()).player;
-      assert.deepEqual([player.buildId,player.stamina,player.maxStamina,player.money,player.score],[id,stamina,stamina,money,0]);
+      assert.deepEqual([player.buildId,player.stamina,player.maxStamina,player.money],[id,stamina,stamina,money]);
       await acknowledge();
     }
     const sizes=[[320,844],[390,844],[390,900],[430,932]];
@@ -124,7 +125,7 @@ const os = require('node:os');
     await page.evaluate(()=>{window.NMLDebug.changeScene('HOME');const key='nightMarketLife.characterSettings.v1';const setting=JSON.parse(localStorage.getItem(key));setting.buildId='removed';localStorage.setItem(key,JSON.stringify(setting));});
     await page.reload(); assert.equal(await home.locator('[data-home-build="name"]').innerText(),'社會人');
     const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('nightMarketLife.characterSettings.v1')));
-    for(const key of ['openingConditionId','openingPending','stamina','money','score'])assert.equal(Object.hasOwn(stored,key),false);
+    for(const key of ['openingConditionId','openingPending','startingMoney','stamina','money','score'])assert.equal(Object.hasOwn(stored,key),false);
     assert.deepEqual(errors,[]);
     console.log('Step 7 browser PASS: build/avatar persistence, weighted opening flow, blocking, gameplay/event/management/result, six openings x four mobile sizes; console errors 0');
   } finally { await browser.close(); }

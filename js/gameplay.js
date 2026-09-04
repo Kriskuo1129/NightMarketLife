@@ -6,8 +6,7 @@ export function projectResources(player, activity, mosquito = false) {
   const recovered = Math.min(player.maxStamina, Math.max(0, player.stamina + activity.staminaDelta));
   return {
     stamina: Math.max(0, recovered - (mosquito ? CONFIG.mosquitoStaminaPenalty : 0)),
-    money: Math.max(0, player.money + activity.moneyDelta),
-    score: player.score + Math.max(0, activity.scoreDelta)
+    money: Math.max(0, player.money + activity.moneyDelta)
   };
 }
 
@@ -17,7 +16,7 @@ export function getStallActivity(stall, environment) {
   }
   if (stall?.type === "FOOD") return {
     staminaDelta: stall.staminaRecovery, moneyDelta: -getEffectiveFoodPrice(stall, environment),
-    scoreDelta: 0, completed: true, progressCost: 1, sourceId: stall.id
+    completed: true, progressCost: 1, sourceId: stall.id
   };
   return null;
 }

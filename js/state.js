@@ -8,7 +8,7 @@ export function createProgress(randomFn = Math.random) {
 }
 
 export function createStatistics() {
-  return { totalActions: 0, foodPurchases: 0, gamePlays: {}, mosquitoActions: 0, stallVisits: {}, eventHistory: [] };
+  return { totalActions: 0, foodPurchases: 0, gamePlays: {}, mosquitoActions: 0, stallVisits: {}, stallMoneyFlow: {}, eventHistory: [] };
 }
 
 export function createGameState(characterSettings = {}) {
@@ -21,7 +21,7 @@ export function createGameState(characterSettings = {}) {
     activeEvents: createActiveEvents(),
     statistics: createStatistics(),
     achievements: createInitialAchievements(),
-    session: { scene: "HOME", lastActivitySourceId: null, selectedStallId: stalls[0]?.id ?? null, presentation: null, presentationQueue: [], pendingEnvironmentEvent: null, endReason: null, achievementTracking: createAchievementTracking(), openingConditionId: null, openingPending: false }
+    session: { scene: "HOME", startingMoney: null, lastActivitySourceId: null, selectedStallId: stalls[0]?.id ?? null, presentation: null, presentationQueue: [], pendingEnvironmentEvent: null, endReason: null, achievementTracking: createAchievementTracking(), openingConditionId: null, openingPending: false }
   };
 }
 

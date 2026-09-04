@@ -1,10 +1,8 @@
 // Phase 1 Temporary Balance: revisit thresholds when integrating the real games.
-export const ACHIEVEMENT_THRESHOLDS = Object.freeze({ games: 3, manyGames: 8, hotScore: 300, legendScore: 800, foods: 3, usualVisits: 3, rainActions: 2, mosquitoActions: 3, homeStamina: 50, homeMoney: 500 });
+export const ACHIEVEMENT_THRESHOLDS = Object.freeze({ games: 3, manyGames: 8, foods: 3, usualVisits: 3, rainActions: 2, mosquitoActions: 3, homeStamina: 50, homeMoney: 500 });
 export const ACHIEVEMENT_CONFIG = Object.freeze([
   ["COME_ALL_THE_WAY", "來都來了", "都走到攤位前面了，不玩一下說不過去吧。"],
   ["CANT_STOP", "欲罷不能", "說好最後一次，通常都不是最後一次。"],
-  ["HOT_HAND", "手感正熱", "今晚手感正好，再玩一攤也不嫌多。"],
-  ["NIGHT_MARKET_LEGEND", "夜市傳奇", "今晚過後，老闆們可能會記得你。"],
   ["BIG_EATER", "大吃特吃", "來夜市不吃東西，不然要幹嘛？"],
   ["HERE_TO_EAT", "專程來吃", "說是來逛夜市，其實只是換個地方吃飯。"],
   ["THE_USUAL", "老闆照舊", "老闆已經懶得問你要吃什麼了。"],
@@ -47,8 +45,6 @@ export function evaluateAchievements(state, { before, raining = false, foodActio
   const conditions = {
     COME_ALL_THE_WAY: games >= limits.games,
     CANT_STOP: games >= limits.manyGames,
-    HOT_HAND: p.score >= limits.hotScore,
-    NIGHT_MARKET_LEGEND: p.score >= limits.legendScore,
     BIG_EATER: s.foodPurchases >= limits.foods,
     HERE_TO_EAT: s.foodPurchases >= limits.foods && s.foodPurchases > games,
     THE_USUAL: state.stalls.some(stall => stall.type === "FOOD" && (s.stallVisits[stall.id] ?? 0) >= limits.usualVisits),

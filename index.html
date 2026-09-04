@@ -67,7 +67,6 @@
       <header class="market-hud">
         <dl class="hud-stats" aria-label="玩家狀態">
           <div><dt>❤️ 體力</dt><dd data-player="stamina"></dd></div>
-          <div><dt>⭐ 精彩分數</dt><dd data-player="score"></dd></div>
           <div><dt>💰 金錢</dt><dd data-player="money"></dd></div>
         </dl>
       </header>
@@ -99,7 +98,13 @@
         </span>
         <p class="result-player"><strong data-player="name"></strong>，今晚先逛到這裡。</p>
       </div>
-      <dl class="result-score"><dt>今晚精彩分數</dt><dd data-player="score"></dd></dl>
+      <dl class="result-money"><dt>今晚帶回家</dt><dd data-result-money="final"></dd></dl>
+      <p class="result-money-summary">今晚開始：<strong data-result-money="starting"></strong>　相較開局：<strong data-result-money="delta"></strong></p>
+      <button class="modal-secondary-button" type="button" data-action="toggle-money-flow">查看今晚收支</button>
+      <section class="money-flow-details" data-money-flow-details hidden aria-label="今晚各攤位收支">
+        <ul class="money-flow-list" data-money-flow></ul>
+        <p data-money-flow-empty>今晚沒有留下明顯的攤位收支紀錄。</p>
+      </section>
       <section class="result-stories" aria-labelledby="result-stories-title">
         <h3 id="result-stories-title">今晚的你</h3>
         <ul class="result-achievements" data-result-achievements></ul>

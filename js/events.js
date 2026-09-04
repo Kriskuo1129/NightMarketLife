@@ -139,6 +139,6 @@ export const getEffectiveFoodPrice = (stall, environment) => Math.round(stall.pr
 export function applyRewardModifier(result, environment) {
   const multiplier = CONFIG.rewardMultipliers[environment.rewardLevel] ?? 1;
   const adjusted = { ...result };
-  for (const key of ["moneyDelta", "scoreDelta"]) if (adjusted[key] > 0) adjusted[key] = Math.round(adjusted[key] * multiplier);
+  if (adjusted.moneyDelta > 0) adjusted.moneyDelta = Math.round(adjusted.moneyDelta * multiplier);
   return adjusted;
 }

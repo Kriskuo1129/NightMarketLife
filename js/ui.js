@@ -25,8 +25,7 @@ export function render(gameState) {
   const values = {
     name: getPlayerDisplayName(gameState.player),
     stamina: `${gameState.player.stamina} / ${gameState.player.maxStamina}`,
-    money: gameState.player.money,
-    score: gameState.player.score
+    money: gameState.player.money
   };
   document.querySelectorAll("[data-player]").forEach((element) => {
     element.textContent = values[element.dataset.player] ?? "";
@@ -94,7 +93,38 @@ export function renderResult(gameState) {
   }));
   const empty = document.querySelector("[data-result-empty]");
   if (empty) empty.hidden = unlocked.length > 0;
+  const starting = gameState.session.startingMoney ?? gameState.player.money;
+  const moneyValues = {
+    final: formatMoney(gameState.player.money),
+    starting: formatMoney(starting),
+    delta: formatMoneyDelta(gameState.player.money - starting)
+  };
+  document.querySelectorAll("[data-result-money]").forEach(element => {
+    element.textContent = moneyValues[element.dataset.resultMoney] ?? "";
+  });
+  const flow = document.querySelector("[data-money-flow]");
+  if (flow) {
+    const rows = gameState.stalls
+      .map(stall => ({ stall, amount: gameState.statistics.stallMoneyFlow[stall.id] ?? 0 }))
+      .filter(item => item.amount !== 0);
+    flow.replaceChildren(...rows.map(({ stall, amount }) => {
+      const item = document.createElement("li");
+      const name = document.createElement("span");
+      const value = document.createElement("strong");
+      name.textContent = stall.name;
+      value.textContent = formatMoneyDelta(amount);
+      item.append(name, value);
+      return item;
+    }));
+    const flowEmpty = document.querySelector("[data-money-flow-empty]");
+    if (flowEmpty) flowEmpty.hidden = rows.length > 0;
+  }
 }
+
+const formatMoney = value => `$${Number(value).toLocaleString("en-US")}`;
+export const formatMoneyDelta = value => value > 0
+  ? `+$${Number(value).toLocaleString("en-US")}`
+  : value < 0 ? `-$${Math.abs(Number(value)).toLocaleString("en-US")}` : "$0";
 
 export function changeScene(gameState, scene) {
   if (!Object.hasOwn(SCENES, scene)) throw new Error(`Unknown scene: ${scene}`);
@@ -178,7 +208,7 @@ function renderEnvironmentStage(gameState) {
   if (message) message.textContent = showingResult ? presentation.title : view.message;
   if (result) {
     result.hidden = !showingResult;
-    if (showingResult) result.textContent = [["❤️", presentation.staminaDelta], ["⭐", presentation.scoreDelta], ["💰", presentation.moneyDelta]]
+    if (showingResult) result.textContent = [["❤️", presentation.staminaDelta], ["💰", presentation.moneyDelta]]
       .filter(([, delta]) => delta !== 0).map(([icon, delta]) => `${icon} ${formatSignedDelta(delta)}`).join("　");
   }
 }

@@ -139,8 +139,13 @@ dialog { width:min(calc(100% - 2rem),27rem); max-height:calc(100vh - 2rem); padd
 .result-identity { display:grid; justify-items:center; gap:.45rem; margin:1rem 0; }
 .avatar-frame--result { width:5rem; }
 .result-player { color:#e6cba7; }
-.result-score { margin:1.5rem 0; padding:1.25rem; border-block:1px solid #74503a; color:#e6cba7; }
-.result-score dd { margin:.25rem 0 0; color:#ffd36a; font-size:clamp(2.5rem,12vw,4rem); font-weight:900; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.result-money { margin:1.5rem 0 .65rem; padding:1.25rem; border-block:1px solid #74503a; color:#e6cba7; }
+.result-money dd { margin:.25rem 0 0; color:#ffd36a; font-size:clamp(2.5rem,12vw,4rem); font-weight:900; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.result-money-summary { color:#e6cba7; line-height:1.7; overflow-wrap:anywhere; }
+.money-flow-details { margin-top:1rem; padding:1rem; border:1px solid #74503a; border-radius:.8rem; text-align:left; }
+.money-flow-list { display:grid; gap:.65rem; margin:0; padding:0; list-style:none; }
+.money-flow-list li { display:flex; justify-content:space-between; gap:1rem; color:#ead6ba; }
+.money-flow-list strong { color:#ffd36a; font-variant-numeric:tabular-nums; }
 .result-stories { margin:1.5rem 0; text-align:left; }
 .result-stories h3 { color:#ffd7a1; }
 .result-achievements { display:grid; gap:.75rem; list-style:none; padding:0; }

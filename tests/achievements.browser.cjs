@@ -35,9 +35,18 @@ const path = require('node:path');
     await goHome();
     const result = page.locator('[data-scene="RESULT"]');
     const text = await result.innerText();
-    for (const name of ['夜市旅人','大吃特吃','專程來吃','老闆照舊','來都來了','今晚精彩分數']) assert.ok(text.includes(name), name);
-    assert.equal(await result.locator('[data-player="score"]').innerText(), '60');
-    assert.equal(await result.locator('[data-player="money"], [data-player="stamina"]').count(), 0);
+    for (const name of ['夜市旅人','大吃特吃','專程來吃','老闆照舊','來都來了','今晚帶回家']) assert.ok(text.includes(name), name);
+    assert.equal(await result.locator('[data-player="score"]').count(), 0);
+    const moneyResult = await page.evaluate(() => {
+      const s=window.NMLDebug.getState(); return { final:s.player.money, start:s.session.startingMoney, flow:s.statistics.stallMoneyFlow };
+    });
+    assert.equal(await result.locator('[data-result-money="final"]').innerText(), `$${moneyResult.final.toLocaleString('en-US')}`);
+    const delta=moneyResult.final-moneyResult.start;
+    assert.equal(await result.locator('[data-result-money="delta"]').innerText(), delta>0?`+$${delta}`:delta<0?`-$${Math.abs(delta)}`:'$0');
+    await result.getByRole('button',{name:'查看今晚收支',exact:true}).click();
+    const flowText=await result.locator('[data-money-flow-details]').innerText();
+    for(const name of ['測試遊戲攤 A','測試遊戲攤 B','測試遊戲攤 C','測試小吃攤 A']) assert.ok(flowText.includes(name),name);
+    assert.doesNotMatch(flowText,/game_01|food_01/);
     assert.ok(await result.locator('[data-avatar-image]').isVisible());
     assert.ok(await result.locator('[data-avatar-image]').evaluate(img => img.complete && img.naturalWidth > 0));
     const storage = await page.evaluate(() => JSON.stringify({ ...localStorage }));
@@ -90,7 +99,6 @@ const path = require('node:path');
     await page.evaluate(async () => {
       window.NMLDebug.newGame({name:'夜市旅人', buildId:'worker'});
       const s = window.NMLDebug.getState();
-      s.player.score=860;
       s.statistics.gamePlays={game_01:8}; s.statistics.foodPurchases=9; s.statistics.mosquitoActions=3;
       for (const stall of s.stalls.filter(a => !a.isSpecial)) s.statistics.stallVisits[stall.id]=3;
       s.statistics.eventHistory.push({eventId:'INFLUENCER'});
@@ -99,7 +107,7 @@ const path = require('node:path');
       window.NMLDebug.render();
     });
     await goHome();
-    assert.equal(await result.locator('li').count(), 17);
+    assert.equal(await result.locator('[data-result-achievements] li').count(), 15);
     const beforeRender = await page.evaluate(() => JSON.stringify(window.NMLDebug.getState()));
     for (const [width,height] of [[320,844],[390,844],[390,900],[430,932]]) {
       await page.setViewportSize({width,height});

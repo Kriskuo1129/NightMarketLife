@@ -1113,3 +1113,39 @@ Opening 是初始世界，不走 Mid-game Prepare／Notify／Commit，不寫 Eve
 舊 Browser suites 使用 `tests/gameplay-fixture.browser.cjs` 固定普通開場並明確確認後才進行原本的 Gameplay 測試，不改正式 Runtime。回歸時發現雨勢文案既有「濕答答」句子不含「雨」，原測試正則過窄；只將雨勢斷言補為「雨或濕答答」，未修改管理處文案／邏輯。
 
 本輪未新增 Achievement、Equipment、Clothing Gameplay、Stall、Mid-game Event、Small Random Event、外部遊戲串接、Backend、Leaderboard、PK、Login 或 Luck。完成後執行 git status／git diff／git diff --stat／git diff --check，不 Commit、不 Push，等待使用者確認。
+
+## Step 8：Money-First Core Revision
+
+### 正式核心模型與 ActivityResult
+
+本節正式取代前述 Step 1、Step 6、Step 7 中所有精彩分數規格。`player.score`、`scoreDelta`、HUD／RESULT Score 顯示、測試遊戲分數、Debug 分數輸入，以及依分數判定的成就均已自正式 Runtime 移除。`normalizeActivityResult()` 目前只正規化 stamina、money、completed、progressCost 與 sourceId；舊呼叫即使夾帶 scoreDelta 也會忽略，不會建立隱藏分數狀態。stamina／money 的原有正負值與最低 0 Clamp 規則維持不變。
+
+三個 `TEST_GAME_RESULTS` 的正式金錢結果保留為 +50／+100／+20，體力消耗維持原設定。Environment `rewardLevel` 現在只放大正數的遊戲 `moneyDelta`；不影響負數金錢、Food、體力或其他欄位。Food Price、Rain、Mosquito、Stall Life、Opening、Event Transaction 與 Presentation Flow 沿用既有規則。
+
+### Starting Money 與單局攤位收支
+
+每次正式 New Game／HOME 開始遊戲時，先由所選身分建立資源，再立即將該局初始金錢寫入 `session.startingMoney`，之後才套用 Opening。這是單局 Session 值，不加入 Character Settings LocalStorage，回首頁／新局會重新建立，不沿用上一局。
+
+`statistics.stallMoneyFlow` 是每局重置的 `{ [stallId]: appliedMoneyDelta }` 聚合表，只記錄正式 GAME／FOOD 攤位實際套用後的金錢差額，因此受最低 0 Clamp 的支出只記玩家真正扣到的數字。同攤多次行動會累加，例如 game_01 的 +100 與 +50 聚合為 +150，food_01 的 -100 與 -200 聚合為 -300。管理處、HOME、Opening、Environment Event、Render、Resize 與一般 Debug `applyActivityResult()` 不入帳；正式 Gameplay 入口與正式外部遊戲結果才啟用追蹤。沒有新增完整 Action Log 或永久收支紀錄。
+
+### Achievement 與正式 RESULT
+
+移除 `HOT_HAND／手感正熱` 與 `NIGHT_MARKET_LEGEND／夜市傳奇` 及其 score 門檻，正式成就總數由 19 調整為 17；其他 17 項條件、單局重置、Storage Policy 與 Environment Commit 時機不變。
+
+RESULT 仍保留 Avatar、玩家名稱、已解鎖成就與回首頁流程，主視覺改為「今晚帶回家」，顯示最終金錢及相對 `startingMoney` 的 `+$N`、`-$N`、`$0` 差額。新增「查看今晚收支」可展開摘要，依正式 Stall Config 自然順序顯示非零 GAME／FOOD 攤位，以中文攤名呈現聚合值、不顯示內部 ID；沒有收支時顯示自然空狀態。所有清單文字透過 textContent 建立。HUD 僅保留體力與金錢。
+
+資源歸零與普通攤位全關仍不會自動 Game Over；stamina／money 可維持 0 並留在 NIGHT_MARKET，只有既有手動回家確認才進 RESULT。
+
+### Tests / Browser / Responsive
+
+`tests/core.test.mjs` **NightMarketLife core tests: PASS**，並在同一核心流程匯入執行 `tests/achievements.test.mjs` 與 `tests/openings.test.mjs`，兩者皆 PASS。新增／更新覆蓋：Player 與 normalized/applied result 不含 score；三個遊戲獎金；Reward 只修改正數遊戲金錢；各 Build 的 startingMoney 與新局重置／Storage 不保存；正式同攤多次收支聚合、非正式來源及 Debug 不入帳；金錢差額格式；17 個成就且兩個 Score 成就不存在；資源歸零及普通攤全關不自動結束。
+
+Playwright + Edge headless 本機獨立測試 context（非實體手機硬體）結果：
+
+- `tests/achievements.browser.cjs` **PASS**：真實 Game／Food／回家／RESULT、Avatar／Storage、Resource／Environment 情境、空與密集成就、最終金錢與差額、展開收支的中文攤名及不洩漏內部 ID；Console Error 0。
+- `tests/environment-flow.browser.cjs` **PASS**：九種 Event、Activity → Event → Resource 順序及四尺寸；Console Error 0。
+- `tests/management-office.browser.cjs` **PASS**：七種環境口語回覆、Pending Lock、零副作用與四尺寸；Console Error／Warning 0。
+- `tests/openings.browser.cjs` **PASS**：Build／Avatar 保存、六種 Opening、Blocking、正式 Game／Food／Event／Management／RESULT 與四尺寸；Console Error 0。
+- **320×844、390×844、390×900、430×932 全 PASS**：RESULT 主金錢、成就與展開收支可讀可操作，無水平 Overflow；長內容可垂直到達。NIGHT_MARKET 固定 HUD／Stage／Stall Grid 與既有 Responsive 行為維持。
+
+本輪未新增或刪除 Stall，未修改 Character Assets、Legacy Character Setup／Paper Doll、Avatar、Opening 機率、Environment Event 種類、Management Office Gameplay、Equipment、Clothing Gameplay、Backend、Login、Leaderboard 或正式第二階段外部遊戲串接。完成後僅執行 git status／git diff／git diff --stat／git diff --check；不 Commit、不 Push，等待確認。

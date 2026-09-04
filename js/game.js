@@ -17,22 +17,21 @@ export function normalizeActivityResult(result = {}) {
   return {
     staminaDelta: Number(result.staminaDelta ?? 0),
     moneyDelta: Number(result.moneyDelta ?? 0),
-    scoreDelta: Math.max(0, Number(result.scoreDelta ?? 0)),
     completed: result.completed ?? true,
     progressCost: Math.max(0, Number(result.progressCost ?? 1)),
     sourceId: String(result.sourceId ?? "")
   };
 }
 
-export function applyActivityResult(result, { mosquito = false, deferNotification = false } = {}) {
+export function applyActivityResult(result, { mosquito = false, deferNotification = false, trackStallMoney = false } = {}) {
   if (isInteractionLocked(gameState)) return false;
   const activity = normalizeActivityResult(result);
-  if (![activity.staminaDelta, activity.moneyDelta, activity.scoreDelta, activity.progressCost].every(Number.isFinite)) {
+  if (![activity.staminaDelta, activity.moneyDelta, activity.progressCost].every(Number.isFinite)) {
     throw new TypeError("ActivityResult numeric fields must be finite numbers.");
   }
   if (!activity.completed) return activity;
   const player = gameState.player;
-  const before = { stamina: player.stamina, money: player.money, score: player.score };
+  const before = { stamina: player.stamina, money: player.money };
   Object.assign(player, projectResources(player, activity, mosquito));
   if (mosquito) {
     gameState.statistics.mosquitoActions += 1;
@@ -40,18 +39,21 @@ export function applyActivityResult(result, { mosquito = false, deferNotificatio
   gameState.progress.actionCount += activity.progressCost;
   gameState.statistics.totalActions += activity.progressCost;
   gameState.session.lastActivitySourceId = activity.sourceId || null;
+  if (trackStallMoney && activity.sourceId && gameState.stalls.some(stall => stall.id === activity.sourceId && ["GAME", "FOOD"].includes(stall.type))) {
+    gameState.statistics.stallMoneyFlow[activity.sourceId] =
+      (gameState.statistics.stallMoneyFlow[activity.sourceId] ?? 0) + (player.money - before.money);
+  }
   evaluateAchievements(gameState, { before, raining: gameState.environment.raining });
   const resourceWarning = getResourceZeroWarning(before, player);
   if (resourceWarning && !deferNotification) enqueuePresentation(resourceWarning);
   render(gameState);
   return { ...activity, resourceWarning, appliedDeltas: {
     staminaDelta: player.stamina - before.stamina,
-    moneyDelta: player.money - before.money,
-    scoreDelta: player.score - before.score
+    moneyDelta: player.money - before.money
   } };
 }
 
-export const handleExternalGameResult = (result) => applyActivityResult(result);
+export const handleExternalGameResult = (result) => applyActivityResult(result, { trackStallMoney: true });
 
 const ACTIVITY_PRESENTATION_DURATION = 2400;
 let activityPresentationTimer = null;
@@ -84,7 +86,6 @@ export function showActivityResultPresentation(stall, activity) {
     type: "ACTIVITY_RESULT",
     title: `${stall.name} ${stall.type === STALL_TYPES.FOOD ? "補充完成" : "挑戰完成"}！`,
     staminaDelta: (activity.appliedDeltas ?? activity).staminaDelta,
-    scoreDelta: (activity.appliedDeltas ?? activity).scoreDelta,
     moneyDelta: (activity.appliedDeltas ?? activity).moneyDelta
   };
   enqueuePresentation(presentation);
@@ -180,7 +181,7 @@ export function playTestGame(stallId, randomFn = Math.random) {
   const failure = getStallEntryFailure(stall);
   if (failure) { showEntryFailure(failure); return false; }
   const environment = gameState.environment;
-  const activity = applyActivityResult(getStallActivity(stall, environment), { mosquito: environment.mosquito, deferNotification: true });
+  const activity = applyActivityResult(getStallActivity(stall, environment), { mosquito: environment.mosquito, deferNotification: true, trackStallMoney: true });
   gameState.statistics.gamePlays[stall.id] = (gameState.statistics.gamePlays[stall.id] ?? 0) + 1;
   gameState.statistics.stallVisits[stall.id] = (gameState.statistics.stallVisits[stall.id] ?? 0) + 1;
   completeStallAction(stall, activity, randomFn);
@@ -216,7 +217,7 @@ export function buyFood(stallId, randomFn = Math.random) {
   if (!stall || stall.type !== STALL_TYPES.FOOD || !FOOD_CONFIG[stallId]) return false;
   const failure = getStallEntryFailure(stall);
   if (failure) { showEntryFailure(failure); return false; }
-  const activity = applyActivityResult(getStallActivity(stall, gameState.environment), { mosquito: gameState.environment.mosquito, deferNotification: true });
+  const activity = applyActivityResult(getStallActivity(stall, gameState.environment), { mosquito: gameState.environment.mosquito, deferNotification: true, trackStallMoney: true });
   gameState.statistics.foodPurchases += 1;
   gameState.statistics.stallVisits[stall.id] = (gameState.statistics.stallVisits[stall.id] ?? 0) + 1;
   completeStallAction(stall, activity, randomFn);
@@ -228,6 +229,7 @@ export function createNewGame(characterSettings = loadCharacterSettings() ?? {},
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   activityPresentationTimer = null;
   resetGameState(characterSettings);
+  gameState.session.startingMoney = gameState.player.money;
   initializeOpening(randomFn);
   changeScene(gameState, SCENES.NIGHT_MARKET);
   resetNightMarketScroll();
@@ -245,6 +247,7 @@ export function startNightMarketFromHome(name = "", randomFn = Math.random) {
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   activityPresentationTimer = null;
   resetGameState({ ...legacyAppearance, name, buildId: gameState.player.buildId });
+  gameState.session.startingMoney = gameState.player.money;
   const saved = saveCharacterSettings(gameState.player);
   if (!saved.ok) {
     setAvatarStatus("玩家資料無法保存，請更換較小的大頭貼後重試。");
@@ -339,6 +342,10 @@ function bindUI() {
     if (button.dataset.action === "enter-stall") enterSelectedStall();
     if (button.dataset.action === "go-home") document.querySelector("#home-dialog")?.showModal();
     if (button.dataset.action === "confirm-home") { button.closest("dialog")?.close(); requestEndGame("HOME"); }
+    if (button.dataset.action === "toggle-money-flow") {
+      const details = document.querySelector("[data-money-flow-details]");
+      if (details) details.hidden = !details.hidden;
+    }
     if (button.dataset.sceneTarget) changeScene(gameState, button.dataset.sceneTarget);
   });
   document.addEventListener("change", async (event) => {

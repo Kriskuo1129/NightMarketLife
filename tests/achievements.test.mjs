@@ -12,8 +12,9 @@ const check = (id, setup, expected = true, context = {}) => {
   const s = createGameState(); setup(s); evaluate(s, context);
   assert.equal(unlocked(s, id), expected, id); return s;
 };
-assert.equal(ACHIEVEMENT_CONFIG.length, 19);
-assert.equal(new Set(ACHIEVEMENT_CONFIG.map(a => a.id)).size, 19);
+assert.equal(ACHIEVEMENT_CONFIG.length, 17);
+assert.equal(new Set(ACHIEVEMENT_CONFIG.map(a => a.id)).size, 17);
+assert.equal(ACHIEVEMENT_CONFIG.some(a => ["HOT_HAND", "NIGHT_MARKET_LEGEND"].includes(a.id)), false);
 for (const a of createGameState().achievements) {
   assert.match(a.name, /^[\p{Script=Han}]{4}$/u);
   assert.deepEqual(Object.keys(a), ["id", "name", "description", "unlocked"]);
@@ -21,14 +22,12 @@ for (const a of createGameState().achievements) {
   assert.notEqual(a.name, "關門專家");
 }
 assert.doesNotMatch(readFileSync(new URL('../js/achievements.js', import.meta.url), 'utf8'), /rarity|COMMON|RARE|EPIC|LEGENDARY/);
-for (const [id, limit, field] of [["COME_ALL_THE_WAY", T.games, "games"], ["CANT_STOP", T.manyGames, "games"], ["HOT_HAND", T.hotScore, "score"], ["NIGHT_MARKET_LEGEND", T.legendScore, "score"], ["BIG_EATER", T.foods, "foodPurchases"], ["HUMAN_MOSQUITO_COIL", T.mosquitoActions, "mosquitoActions"]]) {
+for (const [id, limit, field] of [["COME_ALL_THE_WAY", T.games, "games"], ["CANT_STOP", T.manyGames, "games"], ["BIG_EATER", T.foods, "foodPurchases"], ["HUMAN_MOSQUITO_COIL", T.mosquitoActions, "mosquitoActions"]]) {
   for (const value of [limit - 1, limit]) check(id, s => {
     if (field === "games") s.statistics.gamePlays = { a: 1, b: value - 1 };
-    else if (field === "score") s.player.score = value;
     else s.statistics[field] = value;
   }, value === limit);
 }
-assert.ok(T.legendScore > T.hotScore);
 check("HERE_TO_EAT", s => { s.statistics.foodPurchases = 1; }, false);
 check("HERE_TO_EAT", s => { s.statistics.foodPurchases = 3; s.statistics.gamePlays.a = 3; }, false);
 check("HERE_TO_EAT", s => { s.statistics.foodPurchases = 3; s.statistics.gamePlays.a = 2; });
