@@ -15,21 +15,23 @@ export const STALL_CONFIG = Object.freeze([
 ]);
 
 export const TEST_GAME_RESULTS = Object.freeze({
-  game_01: Object.freeze({ staminaDelta: -10, moneyDelta: 50, completed: true, progressCost: 1, sourceId: "game_01" }),
-  game_02: Object.freeze({ staminaDelta: -10, moneyDelta: 100, completed: true, progressCost: 1, sourceId: "game_02" }),
-  game_03: Object.freeze({ staminaDelta: -10, moneyDelta: 20, completed: true, progressCost: 1, sourceId: "game_03" })
+  game_01: Object.freeze({ staminaDelta: -20, moneyDelta: 50, completed: true, progressCost: 1, sourceId: "game_01" }),
+  game_02: Object.freeze({ staminaDelta: -20, moneyDelta: 100, completed: true, progressCost: 1, sourceId: "game_02" }),
+  game_03: Object.freeze({ staminaDelta: -20, moneyDelta: 20, completed: true, progressCost: 1, sourceId: "game_03" })
 });
 
 export const FOOD_CONFIG = Object.freeze({
-  food_01: Object.freeze({ price: 100, staminaRecovery: 15 }),
-  food_02: Object.freeze({ price: 200, staminaRecovery: 30 })
+  food_01: Object.freeze({ price: 100, staminaRecovery: 15, temperatureType: "NEUTRAL" }),
+  food_02: Object.freeze({ price: 200, staminaRecovery: 30, temperatureType: "HOT" })
 });
 
-const randomInteger = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const LIFE_RANGES=Object.freeze({1:[3,3],2:[3,4],3:[4,5],4:[5,6],5:[6,6]});
+const randomInteger = (min, max,randomFn=Math.random) => Math.floor(randomFn() * (max - min + 1)) + min;
+export function getInitialStallLife(businessLevel,randomFn=Math.random){const [min,max]=LIFE_RANGES[businessLevel]??LIFE_RANGES[3];return randomInteger(min,max,randomFn);}
 
 export function createStall(definition) {
   const isSpecial = Boolean(definition.isSpecial);
-  const maxLife = isSpecial ? null : (definition.maxLife ?? randomInteger(CONFIG.stallLife.min, CONFIG.stallLife.max));
+  const maxLife = isSpecial ? null : (definition.maxLife ?? getInitialStallLife(CONFIG.defaults.businessLevel));
   return {
     id: definition.id,
     name: definition.name,
@@ -43,12 +45,14 @@ export function createStall(definition) {
     isBlocked: false,
     price: definition.price ?? FOOD_CONFIG[definition.id]?.price ?? 0,
     staminaRecovery: definition.staminaRecovery ?? FOOD_CONFIG[definition.id]?.staminaRecovery ?? 0,
+    temperatureType: definition.temperatureType ?? FOOD_CONFIG[definition.id]?.temperatureType ?? "NEUTRAL",
     staminaCost: definition.staminaCost ?? 0,
     interactionType: definition.interactionType
   };
 }
 
 export const createInitialStalls = () => STALL_CONFIG.map(createStall);
+export function initializeStallLife(stalls,businessLevel,randomFn=Math.random){for(const stall of stalls){if(stall.isSpecial)continue;stall.maxLife=getInitialStallLife(businessLevel,randomFn);stall.life=stall.maxLife;stall.isClosed=false;stall.isBlocked=false;}return stalls;}
 
 export const STALL_DISPLAY_STATUS = Object.freeze({
   OPEN: "OPEN",
@@ -59,7 +63,7 @@ export const STALL_DISPLAY_STATUS = Object.freeze({
 export function getStallDisplayStatus(stall, environment) {
   if (!stall) return null;
   syncStallClosure(stall);
-  const isBlocked = Boolean(stall.isBlocked || stall.id === environment.influencerBlockedStallId);
+  const isBlocked = Boolean(stall.isBlocked);
   const code = stall.isClosed
     ? STALL_DISPLAY_STATUS.CLOSED
     : isBlocked

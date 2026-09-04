@@ -5,15 +5,15 @@ import { renderAllCharacters } from "./character-renderer.js";
 import { getStallDisplayStatus } from "./stalls.js";
 import { getEffectiveFoodPrice, getEffectiveGameStaminaCost } from "./events.js";
 import { isInteractionLocked } from "./gameplay.js";
-import { getOpeningById } from "./openings.js";
+import { getNightConditionById } from "./openings.js";
 
-export const SCENES = Object.freeze({ HOME: "HOME", CHARACTER_SETUP: "CHARACTER_SETUP", NIGHT_MARKET: "NIGHT_MARKET", RESULT: "RESULT" });
+export const SCENES = Object.freeze({ HOME: "HOME", CHARACTER_SETUP: "CHARACTER_SETUP", NIGHT_REVEAL: "NIGHT_REVEAL", NIGHT_MARKET: "NIGHT_MARKET", RESULT: "RESULT" });
 
 export function render(gameState) {
   const office = document.querySelector("#management-office-dialog");
   if (office?.open && (gameState.session.scene !== SCENES.NIGHT_MARKET || isInteractionLocked(gameState))) office.close();
   // Close the previous notification before opening the next, in either queue order.
-  for (const [id, type] of [["environment-event-dialog", "ENVIRONMENT_EVENT_MODAL"], ["resource-warning-dialog", "RESOURCE_WARNING_MODAL"]]) {
+  for (const [id, type] of [["environment-event-dialog", "INCIDENT_MODAL"], ["resource-warning-dialog", "RESOURCE_WARNING_MODAL"]]) {
     const dialog = document.querySelector(`#${id}`);
     if (dialog?.open && gameState.session.presentation?.type !== type) dialog.close();
   }
@@ -53,29 +53,12 @@ export function render(gameState) {
     element.textContent = build?.[element.dataset.build] ?? "";
   });
   renderNightMarket(gameState);
-  document.querySelectorAll("[data-home-build]").forEach(element => {
-    element.textContent = build?.[element.dataset.homeBuild] ?? "";
-  });
+  const condition=getNightConditionById(gameState.session.nightConditionId);
+  document.querySelectorAll("[data-night-condition]").forEach(element=>element.textContent=condition?.[element.dataset.nightCondition]??"");
+  document.querySelectorAll("[data-reveal-build]").forEach(element=>element.textContent=build?.[element.dataset.revealBuild]??"");
   renderResult(gameState);
   const nameInput = document.querySelector("#player-name");
   if (nameInput && document.activeElement !== nameInput) nameInput.value = gameState.player.name;
-  renderOpening(gameState);
-}
-
-function renderOpening(gameState) {
-  const dialog = document.querySelector("#opening-dialog");
-  if (!dialog) return;
-  const opening = getOpeningById(gameState.session.openingConditionId);
-  if (gameState.session.scene !== SCENES.NIGHT_MARKET || !gameState.session.openingPending || !opening) {
-    if (dialog.open) dialog.close();
-    return;
-  }
-  // Opening has its own lock, no notification queue or timer.
-  document.querySelectorAll("dialog[open]").forEach(other => { if (other !== dialog) other.close(); });
-  dialog.querySelector("[data-opening-title]").textContent = opening.title;
-  dialog.querySelector("[data-opening-description]").textContent = opening.description;
-  dialog.querySelector("[data-opening-effects]").textContent = opening.effectLines.join("\n");
-  if (!dialog.open) dialog.showModal();
 }
 
 export function renderResult(gameState) {
@@ -131,24 +114,22 @@ export function changeScene(gameState, scene) {
   if (scene === SCENES.HOME || scene === SCENES.RESULT) {
     gameState.session.presentation = null;
     gameState.session.presentationQueue = [];
-    gameState.session.pendingEnvironmentEvent = null;
-    gameState.session.openingPending = false;
-    if (scene === SCENES.HOME) gameState.session.openingConditionId = null;
+    gameState.session.pendingIncident = null;
+    if (scene === SCENES.HOME) gameState.session.nightConditionId = null;
     if (scene === SCENES.HOME) gameState.session.endReason = null;
   }
   gameState.session.scene = scene;
   render(gameState);
 }
 
-export function renderBuildOptions(gameState, { home = false } = {}) {
-  const container = document.querySelector(home ? "[data-home-build-options]" : "[data-build-options]");
+export function renderBuildOptions(gameState) {
+  const container = document.querySelector("[data-build-options]");
   if (!container) return;
   container.replaceChildren(...CONFIG.characterBuilds.map((build) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "build-option";
-    if (home) button.dataset.homeBuildId = build.id;
-    else button.dataset.buildId = build.id;
+    button.dataset.buildId = build.id;
     button.setAttribute("aria-pressed", String(build.id === gameState.player.buildId));
     const name = document.createElement("strong");
     name.textContent = build.name;
@@ -167,20 +148,9 @@ export function setStatus(message = "") {
 }
 
 export function getEnvironmentStageView(environment) {
-  const primary = environment.raining
-    ? { code: "rain", message: "突然下大雨" }
-    : environment.influencer
-      ? { code: "influencer", message: "網紅出現在夜市！" }
-      : environment.mosquito
-        ? { code: "mosquito", message: "附近的蚊子變多了..." }
-        : environment.crowdLevel >= 4
-          ? { code: "crowd", message: "今天的人潮特別多" }
-          : { code: "normal", message: "今晚的夜市十分熱鬧" };
+  const primary=environment.crowdLevel>=4?{code:"crowd",message:"今天的人潮特別熱鬧"}:environment.crowdLevel<=2?{code:"quiet",message:"今晚逛起來格外悠閒"}:{code:"normal",message:"今晚的夜市十分熱鬧"};
   return {
     ...primary,
-    raining: Boolean(environment.raining),
-    mosquito: Boolean(environment.mosquito),
-    influencer: Boolean(environment.influencer),
     crowded: environment.crowdLevel >= 4
   };
 }
@@ -197,9 +167,6 @@ function renderEnvironmentStage(gameState) {
   const showingResult = presentation?.type === "ACTIVITY_RESULT";
   stage.dataset.presentation = showingResult ? "activity-result" : "environment";
   stage.dataset.environmentStage = view.code;
-  stage.dataset.raining = String(view.raining);
-  stage.dataset.mosquito = String(view.mosquito);
-  stage.dataset.influencer = String(view.influencer);
   stage.dataset.crowded = String(view.crowded);
   const kicker = stage.querySelector("[data-stage-kicker]");
   const message = stage.querySelector("[data-environment-message]");
@@ -322,7 +289,7 @@ function renderEnvironmentEventModal(gameState) {
   const dialog = document.querySelector("#environment-event-dialog");
   if (!dialog) return;
   const presentation = gameState.session.presentation;
-  if (presentation?.type !== "ENVIRONMENT_EVENT_MODAL") {
+  if (presentation?.type !== "INCIDENT_MODAL") {
     if (dialog.open) dialog.close();
     return;
   }

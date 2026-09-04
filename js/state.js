@@ -4,11 +4,11 @@ import { createInitialAchievements, createAchievementTracking } from "./achievem
 import { createInitialStalls } from "./stalls.js";
 
 export function createProgress(randomFn = Math.random) {
-  return { actionCount: 0, nextEventAt: getNextEventInterval(randomFn) };
+  return { gameActionCount: 0, nextIncidentAt: getNextEventInterval(randomFn) };
 }
 
 export function createStatistics() {
-  return { totalActions: 0, foodPurchases: 0, gamePlays: {}, mosquitoActions: 0, stallVisits: {}, stallMoneyFlow: {}, eventHistory: [] };
+  return { totalActions: 0, foodPurchases: 0, gamePlays: {}, stallVisits: {}, stallMoneyFlow: {}, incidentHistory: [] };
 }
 
 export function createGameState(characterSettings = {}) {
@@ -21,7 +21,7 @@ export function createGameState(characterSettings = {}) {
     activeEvents: createActiveEvents(),
     statistics: createStatistics(),
     achievements: createInitialAchievements(),
-    session: { scene: "HOME", startingMoney: null, lastActivitySourceId: null, selectedStallId: stalls[0]?.id ?? null, presentation: null, presentationQueue: [], pendingEnvironmentEvent: null, endReason: null, achievementTracking: createAchievementTracking(), openingConditionId: null, openingPending: false }
+    session: { scene: "HOME", startingMoney: null, buildId: null, nightConditionId: null, lastActivitySourceId: null, selectedStallId: stalls[0]?.id ?? null, presentation: null, presentationQueue: [], pendingIncident: null, endReason: null, achievementTracking: createAchievementTracking() }
   };
 }
 

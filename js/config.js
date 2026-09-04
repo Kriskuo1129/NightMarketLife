@@ -6,21 +6,22 @@ export const CONFIG = Object.freeze({
     { id: "middle-aged", name: "中年人", stamina: 85, money: 1300, description: "體力不像以前，但至少口袋比較有底氣。" },
     { id: "senior", name: "老年人", stamina: 70, money: 1600, description: "慢慢逛沒關係，今天主要是不缺錢。" }
   ]),
-  stallLife: Object.freeze({ min: 10, max: 20 }),
-  staminaCosts: Object.freeze({ game: 10, food: 0, testWork: 25 }),
+  staminaCosts: Object.freeze({ game: 20, food: 0, testWork: 25 }),
   foodMaxRecovery: 30,
-  environmentEventInterval: Object.freeze({ min: 4, max: 6 }),
-  influencerLeaveChance: 0.5,
-  rainGameStaminaPenalty: 5,
-  mosquitoStaminaPenalty: 5,
+  incidentInterval: Object.freeze({ min: 2, max: 4 }),
   crowdLevels: Object.freeze({ 1: "冷清", 2: "稀少", 3: "普通", 4: "熱鬧", 5: "爆滿" }),
-  priceMultipliers: Object.freeze([0.9, 1.0, 1.2, 1.4]),
-  rewardMultipliers: Object.freeze([0.8, 1.0, 1.2, 1.5, 2.0]),
-  defaults: Object.freeze({ buildId: "worker", crowdLevel: 3, priceLevel: 1, rewardLevel: 1 })
+  crowdStaminaModifiers: Object.freeze({ 1: -5, 2: -2, 3: 0, 4: 3, 5: 5 }),
+  temperatureStaminaModifiers: Object.freeze({ 1: 4, 2: 2, 3: 0, 4: 2, 5: 5 }),
+  priceMultipliers: Object.freeze({ 1: 0.8, 2: 0.9, 3: 1, 4: 1.2, 5: 1.4 }),
+  rewardMultipliers: Object.freeze({ 1: 0.8, 2: 0.9, 3: 1, 4: 1.2, 5: 1.5 }),
+  defaults: Object.freeze({ buildId: "worker", crowdLevel: 3, priceLevel: 3, rewardLevel: 3, temperatureLevel: 3, businessLevel: 3 })
 });
 
 export const getBuildById = (buildId) =>
   CONFIG.characterBuilds.find((build) => build.id === buildId) ?? null;
+
+export const pickRandomBuild = (randomFn = Math.random) =>
+  CONFIG.characterBuilds[Math.min(CONFIG.characterBuilds.length - 1, Math.floor(Math.max(0, Math.min(1, randomFn())) * CONFIG.characterBuilds.length))];
 
 export const LOW_STAMINA_MESSAGES = Object.freeze([
   "我的腳已經不是我的腳了。", "不行，我的靈魂想玩，但肉體拒絕。",

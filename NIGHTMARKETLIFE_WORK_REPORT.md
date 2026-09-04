@@ -1149,3 +1149,47 @@ Playwright + Edge headless 本機獨立測試 context（非實體手機硬體）
 - **320×844、390×844、390×900、430×932 全 PASS**：RESULT 主金錢、成就與展開收支可讀可操作，無水平 Overflow；長內容可垂直到達。NIGHT_MARKET 固定 HUD／Stage／Stall Grid 與既有 Responsive 行為維持。
 
 本輪未新增或刪除 Stall，未修改 Character Assets、Legacy Character Setup／Paper Doll、Avatar、Opening 機率、Environment Event 種類、Management Office Gameplay、Equipment、Clothing Gameplay、Backend、Login、Leaderboard 或正式第二階段外部遊戲串接。完成後僅執行 git status／git diff／git diff --stat／git diff --check；不 Commit、不 Push，等待確認。
+
+## Step 8.1：Core Rules / Environment / Incident Refactor
+
+### 修改摘要與隨機 Build
+
+HOME 已移除身分選擇卡片、Picker Dialog、HOME 專用 handler 與正式 UI CSS；玩家只輸入名稱／Avatar 後開始。New Game 先等機率抽取五種 Build（每種 20%），Build 仍只決定初始 stamina／maxStamina／money，不含技能或被動效果。隨機身分不再由 HOME 預選；Legacy Character Setup／Paper Doll 的 Build 控制保留且不進正式流程。HOME 的舊 Score 宣傳句亦已移除，NIGHT_MARKET HUD 為兩欄，各 50%，只顯示 Stamina／Money。
+
+### Night Condition 與 Reveal Scene
+
+原 Opening Condition 重構為 `NIGHT_CONDITION_CONFIG`，沿用六個題材及 35／10／15／10／15／15 權重。每個 Condition 只提供敘事資料與五項 Environment 初始 Level，不內嵌 Gameplay modifier。正式順序為 Random Build → Random Night Condition → 套用 Environment → 依 Business 初始化 Stall Life → `NIGHT_REVEAL` → 玩家按「開始逛夜市」→ `NIGHT_MARKET`。Reveal 以自然敘事顯示「今天夜市的環境是……」及「而你今天是……」、身分、體力與金錢，不顯示內部 Level 表或 Debug 資訊。
+
+### Environment Variables / Effective Gameplay
+
+正式 Environment 僅含 crowdLevel、priceLevel、rewardLevel、temperatureLevel、businessLevel，全部 Clamp 1～5，預設皆 3。移除 raining、mosquito、influencer、influencerBlockedStallId 及舊 Start／Stop 配對事件的 Runtime 依賴。
+
+- Game base stamina cost 統一為 20；effective cost = 20 + Crowd modifier（-5／-2／0／+3／+5）+ Temperature modifier（+4／+2／0／+2／+5），最低 0。
+- Food／未來 Shop 價格使用 Price x0.8／0.9／1.0／1.2／1.4 並 Math.round。
+- Game 正數 money reward 使用 Reward x0.8／0.9／1.0／1.2／1.5 並 Math.round；0 或負值不套倍率，小遊戲不讀 Environment。
+- Food 增加 temperatureType。`food_02` 為熱騰騰麵食，指定 HOT：低溫 Level 1／2 加成 +10／+5；`food_01` 描述不足以明確判斷冷熱，採 NEUTRAL、永不加減。COLD helper 已支援高溫 Level 4／5 加成 +5／+10，供後續正式冷食使用。第一版只有 bonus，不因不合溫度扣 recovery。
+
+### Business、Stall Life 與 Game Action
+
+Business 只在每局初始化時決定所有非 Special Stall 的 Life：Level 1 固定3、Level 2 隨機3～4、Level 3 隨機4～5、Level 4 隨機5～6、Level 5 固定6；同局 Render／Resize／Modal 重開不重抽。Special Life 維持 null。
+
+成功 GAME／FOOD 均扣 Life 1，Life 0 自動 CLOSED；既有入口驗證確保體力不足、金錢不足、封鎖、取消與未完成互動不扣 Life。GAME 成功另使 `progress.gameActionCount += 1` 並檢查 Incident；FOOD 仍扣款、回體力、增加 foodPurchases／stallVisits／stallMoneyFlow，但不增加 Game Action、不推 Incident。Special 不扣 Life、不增加 Game Action。
+
+### Incident Trigger / Prepare / Commit
+
+舊 Environment Event 正式改為一次性 Incident。`nextIncidentAt` 初始化及每次 Commit 後均設為 `currentGameActionCount + random(2,4)`；只有成功 GAME 推進計數。Prepare 將變更保存在 `session.pendingIncident`，Modal 顯示自然夜市名稱／敘述，不先污染正式 Environment；玩家確認後 Commit、寫入 `statistics.incidentHistory`、Clamp Level 並排定下一次 Incident。
+
+第一版 Pool 包含 CROWD／PRICE／REWARD／TEMPERATURE／BUSINESS 各 UP、DOWN，共10種；每次只改一級且邊界事件不進 eligible pool。沒有 Rain／Mosquito Start/Stop、持續 Influencer lifecycle 或新的持續事件系統。本輪未加入選配的網紅封鎖與衛生局關攤，以避免擴大範圍。為保持17項單局成就且不依賴已移除 World State，原雨／蚊／網紅三項改為對應 Incident 經歷的「見怪不怪／熱到發亮／生意興隆」；Money-First RESULT、聚合收支及其 Storage 邊界不變。
+
+### Regression / Responsive
+
+- `tests/core.test.mjs`：**NightMarketLife Step 8.1 core tests: PASS**。覆蓋隨機 Build 五等分、六種 Night Condition、五 Environment Key、Game Cost、Food Price／Temperature Recovery、Reward 正值邊界、Business Life、Game／Food／Special Life 與 Game Action 分離、2～4 Incident、10種 Level Clamp、資源歸零／全關不結束、17成就、Money Flow 與無 Score／HOME Build UI。
+- `tests/achievements.test.mjs`：**PASS**；17個唯一成就、廢止事件成就不存在、Gameplay／Settlement 與 stallMoneyFlow 不退化。
+- `tests/openings.test.mjs`（現為 Night Condition regression）：**PASS**；權重、抽樣邊界、五項 Level 與 Clamp。
+- `tests/achievements.browser.cjs`：**PASS**；RESULT final money／delta／攤位收支／Achievement、無 Score UI，Console Error 0。
+- `tests/environment-flow.browser.cjs`（現為 Incident flow）：**PASS**；Food 不推進、Game-only trigger、Prepare→Modal→Commit、下一次2～4與 Level Clamp，Console Error 0。
+- `tests/management-office.browser.cjs`：**PASS**；正式五項 Environment 下自然回覆且完整 State 無副作用，Console Error 0。
+- `tests/openings.browser.cjs`：**PASS**；HOME 無 Build Selector、Random Build、Reveal→Market、五項 Environment，Console Error 0。
+- 320×844、390×844、390×900、430×932：Reveal、Incident Modal、RESULT 均無水平 Overflow、主要按鈕位於可操作範圍，**PASS**。
+
+本輪沒有串接 NML_MoMaJohn、Equipment、排行榜、登入／Backend、Practice Mode、正式 Balance Pass或大量 Incident Content；未修改 Avatar／Paper Doll 核心，沒有自動 Game Over。完成後不 Commit、不 Push。

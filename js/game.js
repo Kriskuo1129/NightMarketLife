@@ -1,17 +1,17 @@
-import { CONFIG, getBuildById, LOW_STAMINA_MESSAGES, NO_MONEY_MESSAGES, pickRandomMessage } from "./config.js";
+import { CONFIG, getBuildById, LOW_STAMINA_MESSAGES, NO_MONEY_MESSAGES, pickRandomBuild, pickRandomMessage } from "./config.js";
 import { gameState, resetGameState } from "./state.js";
 import { clearCharacterSettings, loadCharacterSettings, saveCharacterSettings } from "./storage.js";
 import { SCENES, changeScene as renderScene, getSelectedStall, render, renderBuildOptions, scrollSelectedStallIntoView, selectStall, setStatus } from "./ui.js";
-import { consumeStallLife, FOOD_CONFIG, getStallDisplayStatus, STALL_CONFIG, STALL_TYPES, TEST_GAME_RESULTS } from "./stalls.js";
+import { consumeStallLife, FOOD_CONFIG, getStallDisplayStatus, initializeStallLife, STALL_CONFIG, STALL_TYPES, TEST_GAME_RESULTS } from "./stalls.js";
 import { applyBuildToPlayer } from "./character.js";
 import { changeClothes, changeFace, setCustomAppearance } from "./character-setup.js";
 import { processCustomClothesImage, processCustomFaceImage } from "./uploads.js";
 import { DEFAULT_CLOTHES, FACE_ASSETS, SHOP_CLOTHES } from "../assets/character-assets.js";
 import { getManagementOfficeDialogue } from "./management-office.js";
 import { evaluateAchievements } from "./achievements.js";
-import { applyOpeningCondition, pickOpeningCondition } from "./openings.js";
+import { applyNightCondition, pickNightCondition } from "./openings.js";
 import { getResourceZeroWarning, getStallActivity, isInteractionLocked, predictStallAction, projectResources } from "./gameplay.js";
-import { checkEnvironmentEvent, commitPendingEnvironmentEvent, getEffectiveFoodPrice, getEffectiveGameStaminaCost, moveInfluencer, triggerEnvironmentEvent as triggerEvent } from "./events.js";
+import { checkIncident, commitPendingIncident, getEffectiveFoodPrice, getEffectiveGameStaminaCost, triggerIncident } from "./events.js";
 
 export function normalizeActivityResult(result = {}) {
   return {
@@ -23,7 +23,7 @@ export function normalizeActivityResult(result = {}) {
   };
 }
 
-export function applyActivityResult(result, { mosquito = false, deferNotification = false, trackStallMoney = false } = {}) {
+export function applyActivityResult(result, { deferNotification = false, trackStallMoney = false } = {}) {
   if (isInteractionLocked(gameState)) return false;
   const activity = normalizeActivityResult(result);
   if (![activity.staminaDelta, activity.moneyDelta, activity.progressCost].every(Number.isFinite)) {
@@ -32,18 +32,14 @@ export function applyActivityResult(result, { mosquito = false, deferNotificatio
   if (!activity.completed) return activity;
   const player = gameState.player;
   const before = { stamina: player.stamina, money: player.money };
-  Object.assign(player, projectResources(player, activity, mosquito));
-  if (mosquito) {
-    gameState.statistics.mosquitoActions += 1;
-  }
-  gameState.progress.actionCount += activity.progressCost;
+  Object.assign(player, projectResources(player, activity));
   gameState.statistics.totalActions += activity.progressCost;
   gameState.session.lastActivitySourceId = activity.sourceId || null;
   if (trackStallMoney && activity.sourceId && gameState.stalls.some(stall => stall.id === activity.sourceId && ["GAME", "FOOD"].includes(stall.type))) {
     gameState.statistics.stallMoneyFlow[activity.sourceId] =
       (gameState.statistics.stallMoneyFlow[activity.sourceId] ?? 0) + (player.money - before.money);
   }
-  evaluateAchievements(gameState, { before, raining: gameState.environment.raining });
+  evaluateAchievements(gameState, { before });
   const resourceWarning = getResourceZeroWarning(before, player);
   if (resourceWarning && !deferNotification) enqueuePresentation(resourceWarning);
   render(gameState);
@@ -68,7 +64,7 @@ export function clearActivityResultPresentation(presentation = gameState.session
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   gameState.session.presentation = null;
   gameState.session.presentationQueue = [];
-  gameState.session.pendingEnvironmentEvent = null;
+  gameState.session.pendingIncident = null;
   activityPresentationTimer = null;
   render(gameState);
   return true;
@@ -99,12 +95,12 @@ function enqueuePresentation(presentation) {
 
 export function advancePresentation(expected = gameState.session.presentation) {
   if (expected !== gameState.session.presentation) return false;
-  if (["ENVIRONMENT_EVENT_MODAL", "RESOURCE_WARNING_MODAL"].includes(expected?.type)) return false;
+  if (["INCIDENT_MODAL", "RESOURCE_WARNING_MODAL"].includes(expected?.type)) return false;
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   const presentation = gameState.session.presentationQueue.shift() ?? null;
   gameState.session.presentation = presentation;
   activityPresentationTimer = null;
-  if (presentation && !["ENVIRONMENT_EVENT_MODAL", "RESOURCE_WARNING_MODAL"].includes(presentation.type)) {
+  if (presentation && !["INCIDENT_MODAL", "RESOURCE_WARNING_MODAL"].includes(presentation.type)) {
     activityPresentationTimer = setTimeout(() => advancePresentation(presentation), ACTIVITY_PRESENTATION_DURATION);
     activityPresentationTimer?.unref?.();
   }
@@ -114,12 +110,12 @@ export function advancePresentation(expected = gameState.session.presentation) {
 
 function presentEvent(event) {
   if (!event) return;
-  enqueuePresentation({ type: "ENVIRONMENT_EVENT_MODAL", eventId: event.eventId, pendingEvent: event, ...event.ui });
+  enqueuePresentation({ type: "INCIDENT_MODAL", eventId: event.eventId, pendingIncident: event, ...event.ui });
 }
 
 export function acknowledgeEnvironmentEvent(expected = gameState.session.presentation) {
-  if (expected !== gameState.session.presentation || expected?.type !== "ENVIRONMENT_EVENT_MODAL") return false;
-  if (!commitPendingEnvironmentEvent(gameState, expected.pendingEvent)) return false;
+  if (expected !== gameState.session.presentation || expected?.type !== "INCIDENT_MODAL") return false;
+  if (!commitPendingIncident(gameState, expected.pendingIncident)) return false;
   evaluateAchievements(gameState);
   gameState.session.presentation = null;
   return advancePresentation();
@@ -141,7 +137,7 @@ export function acknowledgeResourceWarning() {
 
 export function triggerEnvironmentEvent(randomFn = Math.random) {
   if (isInteractionLocked(gameState)) return false;
-  const event = triggerEvent(gameState, randomFn);
+  const event = triggerIncident(gameState, randomFn);
   presentEvent(event);
   render(gameState);
   return event;
@@ -155,17 +151,9 @@ function completeStallAction(stall, activity, randomFn) {
     foodClosed: stall.type === STALL_TYPES.FOOD && lifeBefore > 0 && stall.life === 0 && stall.isClosed
   });
   let event = null;
-  if (gameState.progress.actionCount >= gameState.progress.nextEventAt) {
-    // Preserve the existing movement-before-event draw order, but stage all
-    // environment changes until acknowledgement (including the movement).
-    const projectedState = { ...gameState, environment: { ...gameState.environment }, session: { ...gameState.session } };
-    moveInfluencer(projectedState, randomFn);
-    event = checkEnvironmentEvent(projectedState, randomFn);
-    const projectedEnvironment = { ...projectedState.environment, ...event.projected };
-    event.projected = Object.fromEntries(Object.entries(projectedEnvironment).filter(([key, value]) => value !== gameState.environment[key]));
-    gameState.session.pendingEnvironmentEvent = event;
-  } else {
-    moveInfluencer(gameState, randomFn);
+  if (stall.type === STALL_TYPES.GAME) {
+    gameState.progress.gameActionCount += 1;
+    event = checkIncident(gameState, randomFn);
   }
   showActivityResultPresentation(stall, activity);
   presentEvent(event);
@@ -181,7 +169,7 @@ export function playTestGame(stallId, randomFn = Math.random) {
   const failure = getStallEntryFailure(stall);
   if (failure) { showEntryFailure(failure); return false; }
   const environment = gameState.environment;
-  const activity = applyActivityResult(getStallActivity(stall, environment), { mosquito: environment.mosquito, deferNotification: true, trackStallMoney: true });
+  const activity = applyActivityResult(getStallActivity(stall, environment), { deferNotification: true, trackStallMoney: true });
   gameState.statistics.gamePlays[stall.id] = (gameState.statistics.gamePlays[stall.id] ?? 0) + 1;
   gameState.statistics.stallVisits[stall.id] = (gameState.statistics.stallVisits[stall.id] ?? 0) + 1;
   completeStallAction(stall, activity, randomFn);
@@ -217,7 +205,7 @@ export function buyFood(stallId, randomFn = Math.random) {
   if (!stall || stall.type !== STALL_TYPES.FOOD || !FOOD_CONFIG[stallId]) return false;
   const failure = getStallEntryFailure(stall);
   if (failure) { showEntryFailure(failure); return false; }
-  const activity = applyActivityResult(getStallActivity(stall, gameState.environment), { mosquito: gameState.environment.mosquito, deferNotification: true, trackStallMoney: true });
+  const activity = applyActivityResult(getStallActivity(stall, gameState.environment), { deferNotification: true, trackStallMoney: true });
   gameState.statistics.foodPurchases += 1;
   gameState.statistics.stallVisits[stall.id] = (gameState.statistics.stallVisits[stall.id] ?? 0) + 1;
   completeStallAction(stall, activity, randomFn);
@@ -228,10 +216,12 @@ export function createNewGame(characterSettings = loadCharacterSettings() ?? {},
   document.querySelector("#management-office-dialog")?.close();
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   activityPresentationTimer = null;
-  resetGameState(characterSettings);
+  const build = pickRandomBuild(randomFn);
+  resetGameState({ ...characterSettings, buildId: build.id });
+  gameState.session.buildId = build.id;
   gameState.session.startingMoney = gameState.player.money;
-  initializeOpening(randomFn);
-  changeScene(gameState, SCENES.NIGHT_MARKET);
+  initializeNightCondition(randomFn);
+  changeScene(gameState, SCENES.NIGHT_REVEAL);
   resetNightMarketScroll();
   return gameState;
 }
@@ -246,7 +236,9 @@ export function startNightMarketFromHome(name = "", randomFn = Math.random) {
   const legacyAppearance = loadCharacterSettings() ?? {};
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   activityPresentationTimer = null;
-  resetGameState({ ...legacyAppearance, name, buildId: gameState.player.buildId });
+  const build = pickRandomBuild(randomFn);
+  resetGameState({ ...legacyAppearance, name, buildId: build.id });
+  gameState.session.buildId = build.id;
   gameState.session.startingMoney = gameState.player.money;
   const saved = saveCharacterSettings(gameState.player);
   if (!saved.ok) {
@@ -255,37 +247,22 @@ export function startNightMarketFromHome(name = "", randomFn = Math.random) {
     return false;
   }
   setStatus("");
-  initializeOpening(randomFn);
-  changeScene(gameState, SCENES.NIGHT_MARKET);
+  initializeNightCondition(randomFn);
+  changeScene(gameState, SCENES.NIGHT_REVEAL);
   resetNightMarketScroll();
   return gameState;
 }
 
-function initializeOpening(randomFn) {
-  const opening = pickOpeningCondition(randomFn);
-  applyOpeningCondition(gameState.environment, opening);
-  gameState.session.openingConditionId = opening.id;
-  gameState.session.openingPending = true;
+function initializeNightCondition(randomFn) {
+  const condition = pickNightCondition(randomFn);
+  applyNightCondition(gameState.environment, condition);
+  gameState.session.nightConditionId = condition.id;
+  initializeStallLife(gameState.stalls, gameState.environment.businessLevel, randomFn);
 }
 
-export function acknowledgeOpening(expectedId = gameState.session.openingConditionId) {
-  if (gameState.session.scene !== SCENES.NIGHT_MARKET || !gameState.session.openingPending || expectedId !== gameState.session.openingConditionId) return false;
-  gameState.session.openingPending = false;
-  render(gameState);
-  return true;
-}
-
-export function selectHomeBuild(buildId) {
-  if (gameState.session.scene !== SCENES.HOME) return false;
-  const build = getBuildById(buildId) ?? getBuildById(CONFIG.defaults.buildId);
-  const name = document.querySelector("#player-name")?.value.trim() ?? gameState.player.name;
-  const saved = saveCharacterSettings({ ...gameState.player, name, buildId: build.id });
-  if (!saved.ok) { setAvatarStatus("身分設定無法保存，請稍後再試。"); return false; }
-  gameState.player.buildId = build.id;
-  gameState.player.name = name;
-  document.querySelector("#home-build-dialog")?.close();
-  setAvatarStatus("");
-  render(gameState);
+export function acknowledgeOpening(expectedId = gameState.session.nightConditionId) {
+  if (gameState.session.scene !== SCENES.NIGHT_REVEAL || expectedId !== gameState.session.nightConditionId) return false;
+  changeScene(gameState, SCENES.NIGHT_MARKET);
   return true;
 }
 
@@ -311,11 +288,6 @@ function bindUI() {
     if (button.dataset.action === "acknowledge-event") { acknowledgeEnvironmentEvent(); return; }
     if (button.dataset.action === "acknowledge-resource") { acknowledgeResourceWarning(); return; }
     if (isInteractionLocked(gameState) && gameState.session.scene === SCENES.NIGHT_MARKET) return;
-    if (button.dataset.action === "open-home-build" && gameState.session.scene === SCENES.HOME) {
-      renderBuildOptions(gameState, { home: true });
-      document.querySelector("#home-build-dialog")?.showModal();
-    }
-    if (button.dataset.homeBuildId) { selectHomeBuild(button.dataset.homeBuildId); return; }
     if (button.dataset.action === "show-pro") document.querySelector("#pro-dialog")?.showModal();
     if (button.dataset.action === "open-build") {
       renderBuildOptions(gameState);
@@ -458,18 +430,10 @@ export function setStallClosed(stallId, isClosed) {
   return true;
 }
 
-export function setEnvironmentFlag(flag, active) {
-  if (!["raining", "mosquito", "influencer"].includes(flag)) return false;
-  gameState.environment[flag] = Boolean(active);
-  if (flag === "influencer" && !active) gameState.environment.influencerBlockedStallId = null;
-  render(gameState);
-  return true;
-}
-
-export function setInfluencer(active, stallId = null) {
-  gameState.environment.influencer = Boolean(active);
-  gameState.environment.influencerBlockedStallId = active ? stallId : null;
-  render(gameState);
+export function setEnvironmentLevel(key, level) {
+  if (!["crowdLevel","priceLevel","rewardLevel","temperatureLevel","businessLevel"].includes(key)) return false;
+  gameState.environment[key] = Math.min(5, Math.max(1, Number(level)));
+  render(gameState); return true;
 }
 export function completeCharacterSetup() {
 
@@ -514,9 +478,7 @@ window.NMLDebug = Object.freeze({
   selectStall: selectStallAndScroll,
   closeStall: (id) => setStallClosed(id, true),
   openStall: (id) => setStallClosed(id, false),
-  setRain: (active) => setEnvironmentFlag("raining", active),
-  setMosquito: (active) => setEnvironmentFlag("mosquito", active),
-  setInfluencer,
+  setEnvironmentLevel,
   render: () => render(gameState)
 });
 

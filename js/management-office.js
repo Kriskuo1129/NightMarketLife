@@ -2,26 +2,6 @@ import { CONFIG, pickRandomMessage } from "./config.js";
 
 // Spoken observations only. Internal hint keys and weights never go into the UI.
 export const MANAGEMENT_DIALOGUE_POOLS = Object.freeze(Object.fromEntries(Object.entries({
-  rain: [
-    "外面雨下得不小啦，走來走去會比較累，你自己注意一點。",
-    "今天這雨一下就沒完沒了的，鞋子不要等等整雙都是水。",
-    "外面濕答答的，今天要到處跑可能會比平常累一點喔。"
-  ],
-  mosquito: [
-    "今天蚊子有夠多，我坐在這邊都被叮好幾包了。",
-    "今天蚊子特別兇，連我那支扇子都快揮不動了。",
-    "今天蚊子是真的多，你在外面晃太久自己小心啦。"
-  ],
-  influencer: [
-    "剛剛好像有什麼網紅跑來，現在{stall}那邊擠得要命。",
-    "{stall}那邊不知道在拍什麼，一堆人圍在那裡，你等等再去啦。",
-    "剛才有人說網紅來了，現在大家都堵在{stall}那邊。"
-  ],
-  influencerUnlocated: [
-    "聽說有網紅在夜市裡拍片，我倒是沒看清楚跑去哪了。",
-    "剛剛有人扛著鏡頭走過去，說是網紅啦，現在在哪我就不知道了。",
-    "今天有網紅來，我這邊沒看到人擠在哪，你自己留意一下。"
-  ],
   crowdLow: ["今天人比較少啦，逛起來倒是挺舒服的。", "今晚不知道怎樣，人沒有很多，走路滿輕鬆的。"],
   crowdNormal: ["今天人就差不多啦，沒有特別多也沒有特別少。", "今晚人潮算正常啦，沒有擠到走不動。"],
   crowdHigh: ["今天人滿多的，到處都擠擠的。", "今晚有夠熱鬧，走出去都是人。"],
@@ -45,12 +25,6 @@ export const MANAGEMENT_DIALOGUE_POOLS = Object.freeze(Object.fromEntries(Object
 export function collectManagementHints(environment, stalls) {
   const hints = [];
   const add = (key, weight, poolKey = key, stallName = "") => hints.push({ key, weight, pool: MANAGEMENT_DIALOGUE_POOLS[poolKey], stallName });
-  if (environment.raining) add("rain", 4);
-  if (environment.mosquito) add("mosquito", 4);
-  if (environment.influencer) {
-    const target = stalls.find(stall => stall.id === environment.influencerBlockedStallId);
-    add("influencer", 4, target ? "influencer" : "influencerUnlocated", target ? `「${target.name}」` : "");
-  }
   const crowd = environment.crowdLevel;
   add("crowd", crowd === CONFIG.defaults.crowdLevel ? .5 : 2,
     crowd <= 2 ? "crowdLow" : crowd === 3 ? "crowdNormal" : crowd === 4 ? "crowdHigh" : "crowdExtreme");

@@ -1,11 +1,11 @@
 import { CONFIG } from "./config.js";
 import { TEST_GAME_RESULTS } from "./stalls.js";
-import { applyRewardModifier, getEffectiveFoodPrice, getEffectiveGameStaminaCost } from "./events.js";
+import { applyRewardModifier, getEffectiveFoodPrice, getEffectiveGameStaminaCost, getTemperatureFoodBonus } from "./events.js";
 
-export function projectResources(player, activity, mosquito = false) {
+export function projectResources(player, activity) {
   const recovered = Math.min(player.maxStamina, Math.max(0, player.stamina + activity.staminaDelta));
   return {
-    stamina: Math.max(0, recovered - (mosquito ? CONFIG.mosquitoStaminaPenalty : 0)),
+    stamina: Math.max(0, recovered),
     money: Math.max(0, player.money + activity.moneyDelta)
   };
 }
@@ -15,7 +15,7 @@ export function getStallActivity(stall, environment) {
     return applyRewardModifier({ ...TEST_GAME_RESULTS[stall.id], staminaDelta: -getEffectiveGameStaminaCost(stall, environment) }, environment);
   }
   if (stall?.type === "FOOD") return {
-    staminaDelta: stall.staminaRecovery, moneyDelta: -getEffectiveFoodPrice(stall, environment),
+    staminaDelta: stall.staminaRecovery + getTemperatureFoodBonus(stall.temperatureType, environment.temperatureLevel), moneyDelta: -getEffectiveFoodPrice(stall, environment),
     completed: true, progressCost: 1, sourceId: stall.id
   };
   return null;
@@ -24,7 +24,7 @@ export function getStallActivity(stall, environment) {
 export function predictStallAction(state, stall) {
   const activity = getStallActivity(stall, state.environment);
   if (!activity) return null;
-  return projectResources(state.player, activity, state.environment.mosquito);
+  return projectResources(state.player, activity);
 }
 
 export function getResourceZeroWarning(before, after) {
@@ -43,7 +43,7 @@ export function getResourceZeroWarning(before, after) {
 
 export function isInteractionLocked(state) {
   const session = state.session;
-  return Boolean(session.openingPending || session.endReason || session.pendingEnvironmentEvent ||
+  return Boolean(session.endReason || session.pendingIncident ||
     [session.presentation, ...session.presentationQueue].some(item =>
-      ["ENVIRONMENT_EVENT_MODAL", "RESOURCE_WARNING_MODAL"].includes(item?.type)));
+      ["INCIDENT_MODAL", "RESOURCE_WARNING_MODAL"].includes(item?.type)));
 }

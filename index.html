@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="NightMarketLife 夜市人生：創造屬於你的精彩一夜。">
+  <meta name="description" content="NightMarketLife 夜市人生：每晚都有不同故事的台灣夜市。">
   <title>NightMarketLife 夜市人生</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css?v=core-ui-stall-grid">
@@ -15,9 +15,9 @@
         <div class="title-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
         <p class="eyebrow">Night Market Life</p>
         <h1 id="home-title">夜市人生</h1>
-        <p class="tagline">你今晚想過得多精彩？</p>
+        <p class="tagline">今晚，想從哪一盞燈籠開始？</p>
       </div>
-      <p class="intro">勇闖每晚都不一樣的夜市，玩遍奇奇怪怪的攤位、應付意想不到的大小事，拚盡全力把分數衝高，創造屬於你的精彩一夜！</p>
+      <p class="intro">走進每晚都不一樣的夜市，玩遍奇奇怪怪的攤位，也看看今晚會遇上什麼大小事。</p>
       <form id="home-form" class="home-form">
         <div class="home-profile">
           <label class="avatar-upload" aria-label="更換玩家大頭貼">
@@ -34,17 +34,21 @@
           </div>
         </div>
         <p class="avatar-status" data-avatar-status role="status" aria-live="polite"></p>
-        <button class="home-build-picker" type="button" data-action="open-home-build" aria-haspopup="dialog" aria-controls="home-build-dialog">
-          <span>今晚的身分</span><strong><span data-home-build="name"></span> ▾</strong>
-          <span>❤️ 體力 <span data-home-build="stamina"></span>　💰 金錢 <span data-home-build="money"></span></span>
-          <small data-home-build="description"></small>
-        </button>
         <button class="primary-button" type="submit">開始遊戲</button>
       </form>
       <div class="secondary-actions" aria-label="其他模式">
         <button type="button" data-action="show-pro">練習模式</button>
         <button type="button" data-action="show-pro">自訂環境</button>
       </div>
+    </section>
+
+    <section class="scene reveal-scene" data-scene="NIGHT_REVEAL" aria-labelledby="reveal-title" hidden>
+      <p class="eyebrow">今晚揭曉</p>
+      <h2 id="reveal-title">今天夜市的環境是……</h2>
+      <div class="reveal-card"><h3 data-night-condition="title"></h3><p data-night-condition="description"></p></div>
+      <h2>而你今天是……</h2>
+      <div class="reveal-card reveal-build"><h3 data-reveal-build="name"></h3><p>❤️ 體力 <strong data-reveal-build="stamina"></strong>　💰 金錢 <strong data-reveal-build="money"></strong></p></div>
+      <button class="primary-button" type="button" data-action="acknowledge-opening">開始逛夜市</button>
     </section>
 
     <section class="scene setup-scene" data-scene="CHARACTER_SETUP" aria-labelledby="setup-title" hidden>
@@ -74,10 +78,7 @@
       <section class="event-stage" data-environment-stage="normal" aria-live="polite" aria-label="夜市事件舞台">
         <div class="stage-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="stage-visual" aria-hidden="true">
-          <div class="rain-lines"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
           <div class="crowd-dots"><i></i><i></i><i></i><i></i><i></i><i></i></div>
-          <div class="influencer-flash"><i></i><i></i><i></i></div>
-          <div class="mosquito-dots"><i></i><i></i><i></i><i></i></div>
         </div>
         <div class="stage-copy"><span class="stage-kicker" data-stage-kicker>今晚的夜市</span><strong data-environment-message>今晚的夜市十分熱鬧</strong><span class="activity-result-deltas" data-activity-result hidden></span></div>
       </section>
@@ -113,10 +114,7 @@
       <button class="primary-button" type="button" data-scene-target="HOME">回首頁</button>
     </section>
   </main>
-  <dialog id="home-build-dialog" aria-labelledby="home-build-title"><div class="dialog-card"><div class="dialog-heading"><h2 id="home-build-title">今晚的身分</h2><button type="button" data-close-dialog aria-label="關閉身分選擇">×</button></div><div class="build-options" data-home-build-options></div></div></dialog>
-  <dialog id="opening-dialog" aria-labelledby="opening-title" aria-describedby="opening-description opening-effects"><div class="dialog-card"><p class="eyebrow">今晚的夜市……</p><h2 id="opening-title" data-opening-title></h2><p id="opening-description" data-opening-description></p><h3>今晚的情況：</h3><p id="opening-effects" data-opening-effects></p><button class="primary-button" type="button" data-action="acknowledge-opening">開始逛夜市</button></div></dialog>
-
-  <dialog id="environment-event-dialog" aria-labelledby="environment-event-title" aria-describedby="environment-event-description environment-event-effects"><div class="dialog-card"><p class="eyebrow">環境大事件</p><h2 id="environment-event-title" data-event-title></h2><p id="environment-event-description" data-event-description></p><h3>目前影響</h3><p id="environment-event-effects" data-event-effects></p><button class="primary-button" type="button" data-action="acknowledge-event">知道了</button></div></dialog>
+  <dialog id="environment-event-dialog" aria-labelledby="environment-event-title" aria-describedby="environment-event-description environment-event-effects"><div class="dialog-card"><p class="eyebrow">夜市突發事件</p><h2 id="environment-event-title" data-event-title></h2><p id="environment-event-description" data-event-description></p><h3>夜市有了新變化</h3><p id="environment-event-effects" data-event-effects></p><button class="primary-button" type="button" data-action="acknowledge-event">知道了</button></div></dialog>
   <dialog id="build-dialog" aria-labelledby="build-dialog-title"><div class="dialog-card"><div class="dialog-heading"><h2 id="build-dialog-title">選擇角色 Build</h2><button type="button" data-close-dialog aria-label="關閉">×</button></div><div class="build-options" data-build-options></div></div></dialog>
   <dialog id="pro-dialog" aria-labelledby="pro-dialog-title"><div class="dialog-card compact-dialog"><p class="pro-badge">PRO</p><h2 id="pro-dialog-title">僅限 PRO 會員使用</h2><p>這只是夜市老闆開的玩笑，目前沒有真正的會員系統。</p><button class="primary-button" type="button" data-close-dialog>知道了</button></div></dialog>
   <dialog id="stall-detail-dialog" class="stall-detail-dialog" aria-labelledby="stall-detail-title"><div class="dialog-card"><p class="eyebrow">攤位入口</p><h2 id="stall-detail-title" data-selected-stall="name"></h2><p class="stall-status"><span>目前狀態：</span><strong data-selected-stall="status"></strong></p><p class="stall-entry-cost"><span>遊玩需要：</span><strong data-selected-stall="stamina"></strong></p><p class="stall-entry-cost" data-food-info hidden><span>價格：</span><strong data-selected-stall="price"></strong></p><p class="stall-entry-cost" data-food-info hidden><span>恢復：</span><strong data-selected-stall="recovery"></strong></p><p class="stall-block-reason" data-selected-stall="reason" hidden></p><div class="stall-modal-actions"><button class="modal-secondary-button" type="button" data-close-dialog>取消</button><button class="primary-button" type="button" data-action="enter-stall">前往攤位</button></div></div></dialog>

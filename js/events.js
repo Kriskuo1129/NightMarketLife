@@ -1,144 +1,34 @@
 import { CONFIG } from "./config.js";
-
-export function createEnvironment() {
-  return {
-    crowdLevel: CONFIG.defaults.crowdLevel,
-    priceLevel: CONFIG.defaults.priceLevel,
-    rewardLevel: CONFIG.defaults.rewardLevel,
-    raining: false,
-    mosquito: false,
-    influencer: false,
-    influencerBlockedStallId: null
-  };
-}
-
-export const createActiveEvents = () => [];
-
-const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-const pick = (items, randomFn) => items[Math.min(items.length - 1, Math.floor(randomFn() * items.length))] ?? null;
-export function getNextEventInterval(randomFn = Math.random) {
-  const { min, max } = CONFIG.environmentEventInterval;
-  return min + Math.min(max - min, Math.floor(randomFn() * (max - min + 1)));
-}
-export const pickLevelDelta = (randomFn = Math.random) => randomFn() < 0.5 ? 1 : 2;
-export const EVENT_MESSAGES = Object.freeze({
-  RAIN_START: "下雨啦！夜市突然變成水上樂園。",
-  RAIN_STOP: "雨終於停了，拖鞋可以停止吸水了。",
-  MOSQUITO_START: "蚊子大軍抵達戰場。", MOSQUITO_STOP: "蚊子終於放過你了。",
-  INFLUENCER: "網紅來拍片了，又有人把路堵住。",
-  INFLUENCER_LEAVE: "網紅終於拍完了，大家可以走路了。",
-  CROWD_UP: "人突然多了起來，大家到底從哪冒出來的？",
-  CROWD_DOWN: "人潮散了一點，終於不用一直說借過。",
-  PRICE_UP: "老闆們默契十足地一起漲價了。", PRICE_DOWN: "今晚突然開始佛心營業。",
-  REWARD_UP: "今晚手氣好像有點東西。", REWARD_DOWN: "今天的運氣似乎請假了。"
+export const ENVIRONMENT_KEYS=Object.freeze(["crowdLevel","priceLevel","rewardLevel","temperatureLevel","businessLevel"]);
+export const clampEnvironmentLevel=value=>Math.min(5,Math.max(1,Number(value)));
+export function createEnvironment(){return Object.fromEntries(ENVIRONMENT_KEYS.map(key=>[key,CONFIG.defaults[key]]));}
+export const createActiveEvents=()=>[];
+export function getNextIncidentInterval(randomFn=Math.random){const {min,max}=CONFIG.incidentInterval;return min+Math.min(max-min,Math.floor(Math.max(0,Math.min(1,randomFn()))*(max-min+1)));}
+export const getNextEventInterval=getNextIncidentInterval;
+const RULES=Object.freeze({CROWD:"crowdLevel",PRICE:"priceLevel",REWARD:"rewardLevel",TEMPERATURE:"temperatureLevel",BUSINESS:"businessLevel"});
+export const INCIDENT_MESSAGES=Object.freeze({
+  CROWD_UP:["人潮又湧進來了！","入口突然來了一大群人，走道一下子熱鬧起來。"],CROWD_DOWN:["人潮稍微散了","大家陸續離開，走起路來輕鬆多了。"],
+  PRICE_UP:["老闆們換了價目表","幾個攤位悄悄把今晚的價格往上調了。"],PRICE_DOWN:["大家開始殺價","一陣討價還價後，今晚的價格親切了一點。"],
+  REWARD_UP:["遊戲攤開始加碼","歡呼聲此起彼落，老闆們也拿出更多獎金。"],REWARD_DOWN:["遊戲攤收緊獎勵","老闆們突然變得謹慎，獎金沒有剛才大方了。"],
+  TEMPERATURE_UP:["夜市越來越熱","人群和爐火讓空氣又升溫了一些。"],TEMPERATURE_DOWN:["晚風變涼了","一陣風吹過來，夜市裡舒服涼快不少。"],
+  BUSINESS_UP:["今晚生意興隆","攤商補足貨物，準備多接待幾輪客人。"],BUSINESS_DOWN:["有些攤位快賣完了","今晚買氣太旺，攤商手上的存貨開始吃緊。"]
 });
-const EVENT_TITLES = {
-  RAIN_START: "突然下大雨！", RAIN_STOP: "雨停了！",
-  MOSQUITO_START: "蚊子來了！", MOSQUITO_STOP: "蚊子散去了！",
-  INFLUENCER: "網紅來了！", INFLUENCER_LEAVE: "網紅離開了！",
-  CROWD_UP: "人潮增加了！", CROWD_DOWN: "人潮減少了！",
-  PRICE_UP: "食物漲價了！", PRICE_DOWN: "食物降價了！",
-  REWARD_UP: "遊戲獎勵提高！", REWARD_DOWN: "遊戲獎勵降低！"
-};
-// Build notification copy from the projected change, without applying it.
-export function getEnvironmentEventUI(event, state) {
-  const env = { ...state.environment, ...event.projected };
-  const blocked = state.stalls.find(stall => stall.id === env.influencerBlockedStallId);
-  const effects = {
-    RAIN_START: `遊戲攤體力需求增加 ${CONFIG.rainGameStaminaPenalty}`,
-    RAIN_STOP: "遊戲攤體力需求恢復正常",
-    MOSQUITO_START: `每次成功行動額外消耗 ${CONFIG.mosquitoStaminaPenalty} 體力`,
-    MOSQUITO_STOP: "不再受到蚊子額外體力消耗",
-    INFLUENCER: blocked ? `🚫 ${blocked.name} 暫時無法進入` : "目前沒有可封鎖的攤位",
-    INFLUENCER_LEAVE: "網紅封鎖解除",
-    CROWD_UP: `人潮增加，目前：${CONFIG.crowdLevels[env.crowdLevel]}`,
-    CROWD_DOWN: `人潮減少，目前：${CONFIG.crowdLevels[env.crowdLevel]}`,
-    PRICE_UP: `食物價格目前為 ×${CONFIG.priceMultipliers[env.priceLevel]}`,
-    PRICE_DOWN: `食物價格目前為 ×${CONFIG.priceMultipliers[env.priceLevel]}`,
-    REWARD_UP: `遊戲獎勵目前為 ×${CONFIG.rewardMultipliers[env.rewardLevel]}`,
-    REWARD_DOWN: `遊戲獎勵目前為 ×${CONFIG.rewardMultipliers[env.rewardLevel]}`
-  };
-  return { title: EVENT_TITLES[event.eventId], description: EVENT_MESSAGES[event.eventId], effectLines: [effects[event.eventId]] };
-}
-const LEVEL_RULES = {
-  CROWD: { key: "crowdLevel", min: 1, max: 5 },
-  PRICE: { key: "priceLevel", min: 0, max: CONFIG.priceMultipliers.length - 1 },
-  REWARD: { key: "rewardLevel", min: 0, max: CONFIG.rewardMultipliers.length - 1 }
-};
-export function getEligibleEnvironmentEvents(environment) {
-  const pool = [environment.raining ? "RAIN_STOP" : "RAIN_START", environment.mosquito ? "MOSQUITO_STOP" : "MOSQUITO_START"];
-  if (!environment.influencer) pool.push("INFLUENCER");
-  for (const [prefix, { key, min, max }] of Object.entries(LEVEL_RULES)) {
-    if (environment[key] < max) pool.push(`${prefix}_UP`);
-    if (environment[key] > min) pool.push(`${prefix}_DOWN`);
-  }
-  return pool;
-}
-export const pickEnvironmentEvent = (state, randomFn = Math.random) => pick(getEligibleEnvironmentEvents(state.environment), randomFn);
-export function pickInfluencerTarget(stalls, currentId, randomFn = Math.random) {
-  const legal = stalls.filter((stall) => !stall.isSpecial && ["GAME", "FOOD"].includes(stall.type) && !stall.isClosed && stall.life > 0);
-  const candidates = legal.length > 1 ? legal.filter((stall) => stall.id !== currentId) : legal;
-  return pick(candidates, randomFn)?.id ?? null;
-}
-export function moveInfluencer(state, randomFn = Math.random) {
-  if (state.environment.influencer) state.environment.influencerBlockedStallId = pickInfluencerTarget(state.stalls, state.environment.influencerBlockedStallId, randomFn);
-}
-export function prepareEnvironmentEvent(state, eventId, randomFn = Math.random) {
-  if (state.session.pendingEnvironmentEvent) return state.session.pendingEnvironmentEvent;
-  const env = { ...state.environment };
-  if (eventId === "INFLUENCER_LEAVE") {
-    if (!env.influencer) return null;
-  } else if (!getEligibleEnvironmentEvents(env).includes(eventId)) return null;
-  const details = {};
-  if (eventId === "RAIN_START" || eventId === "RAIN_STOP") env.raining = eventId === "RAIN_START";
-  else if (eventId === "MOSQUITO_START" || eventId === "MOSQUITO_STOP") env.mosquito = eventId === "MOSQUITO_START";
-  else if (eventId === "INFLUENCER") {
-    env.influencer = true;
-    env.influencerBlockedStallId = pickInfluencerTarget(state.stalls, null, randomFn);
-    details.targetStallId = env.influencerBlockedStallId;
-  } else if (eventId === "INFLUENCER_LEAVE") {
-    env.influencer = false;
-    env.influencerBlockedStallId = null;
-  } else {
-    const [prefix, direction] = eventId.split("_");
-    const { key, min, max } = LEVEL_RULES[prefix];
-    const before = env[key];
-    env[key] = clamp(before + pickLevelDelta(randomFn) * (direction === "UP" ? 1 : -1), min, max);
-    details.delta = env[key] - before;
-    details.level = env[key];
-  }
-  const projected = Object.fromEntries(Object.entries(env).filter(([key, value]) => value !== state.environment[key]));
-  const event = { eventId, actionCount: state.progress.actionCount, details, projected };
-  event.ui = getEnvironmentEventUI(event, state);
-  state.session.pendingEnvironmentEvent = event;
-  return event;
-}
-export function commitPendingEnvironmentEvent(state, expected = state.session.pendingEnvironmentEvent, randomFn = Math.random) {
-  if (!expected || expected !== state.session.pendingEnvironmentEvent) return null;
-  Object.assign(state.environment, expected.projected);
-  const event = { eventId: expected.eventId, actionCount: expected.actionCount, details: { ...expected.details } };
-  state.statistics.eventHistory.push(event);
-  state.progress.nextEventAt = state.progress.actionCount + getNextEventInterval(randomFn);
-  state.session.pendingEnvironmentEvent = null;
-  return event;
-}
-export function triggerEnvironmentEvent(state, randomFn = Math.random) {
-  if (state.session.pendingEnvironmentEvent) return state.session.pendingEnvironmentEvent;
-  // A departure consumes this event slot; otherwise draw one normal event.
-  const eventId = state.environment.influencer && randomFn() < CONFIG.influencerLeaveChance
-    ? "INFLUENCER_LEAVE" : pickEnvironmentEvent(state, randomFn);
-  return prepareEnvironmentEvent(state, eventId, randomFn);
-}
-export function checkEnvironmentEvent(state, randomFn = Math.random) {
-  return state.progress.actionCount >= state.progress.nextEventAt ? triggerEnvironmentEvent(state, randomFn) : null;
-}
-export function getEffectiveGameStaminaCost(stall, environment) {
-  return stall.staminaCost + (stall.type === "GAME" && environment.raining ? CONFIG.rainGameStaminaPenalty : 0);
-}
-export const getEffectiveFoodPrice = (stall, environment) => Math.round(stall.price * (CONFIG.priceMultipliers[environment.priceLevel] ?? 1));
-export function applyRewardModifier(result, environment) {
-  const multiplier = CONFIG.rewardMultipliers[environment.rewardLevel] ?? 1;
-  const adjusted = { ...result };
-  if (adjusted.moneyDelta > 0) adjusted.moneyDelta = Math.round(adjusted.moneyDelta * multiplier);
-  return adjusted;
-}
+export function getEligibleIncidents(environment){const pool=[];for(const [prefix,key] of Object.entries(RULES)){if(environment[key]<5)pool.push(`${prefix}_UP`);if(environment[key]>1)pool.push(`${prefix}_DOWN`);}return pool;}
+export const getEligibleEnvironmentEvents=getEligibleIncidents;
+const pick=(items,randomFn)=>items[Math.min(items.length-1,Math.floor(Math.max(0,Math.min(1,randomFn()))*items.length))]??null;
+export const pickIncident=(state,randomFn=Math.random)=>pick(getEligibleIncidents(state.environment),randomFn);
+export const pickEnvironmentEvent=pickIncident;
+export function getIncidentUI(incident){const [title,description]=INCIDENT_MESSAGES[incident.eventId]??["夜市有了新變化","今晚的氣氛悄悄改變了。"];const prefix=incident.eventId.split("_")[0];const natural={CROWD:"逛起來的人潮不同了。",PRICE:"攤位價格跟著改變。",REWARD:"遊戲攤的獎金跟著改變。",TEMPERATURE:"體感溫度有了變化。",BUSINESS:"攤商今晚能接待的客人數有了變化。"};return{title,description,effectLines:[natural[prefix]]};}
+export const getEnvironmentEventUI=getIncidentUI;
+export function prepareIncident(state,eventId){if(state.session.pendingIncident)return state.session.pendingIncident;if(!getEligibleIncidents(state.environment).includes(eventId))return null;const [prefix,direction]=eventId.split("_");const key=RULES[prefix],before=state.environment[key],after=clampEnvironmentLevel(before+(direction==="UP"?1:-1));const incident={eventId,gameActionCount:state.progress.gameActionCount,details:{key,before,after},projected:{[key]:after}};incident.ui=getIncidentUI(incident);state.session.pendingIncident=incident;return incident;}
+export const prepareEnvironmentEvent=prepareIncident;
+export function commitPendingIncident(state,expected=state.session.pendingIncident,randomFn=Math.random){if(!expected||expected!==state.session.pendingIncident)return null;Object.assign(state.environment,expected.projected);state.statistics.incidentHistory.push({eventId:expected.eventId,gameActionCount:expected.gameActionCount,details:{...expected.details}});state.progress.nextIncidentAt=state.progress.gameActionCount+getNextIncidentInterval(randomFn);state.session.pendingIncident=null;return expected;}
+export const commitPendingEnvironmentEvent=commitPendingIncident;
+export function triggerIncident(state,randomFn=Math.random){return prepareIncident(state,pickIncident(state,randomFn));}
+export const triggerEnvironmentEvent=triggerIncident;
+export const checkIncident=(state,randomFn=Math.random)=>state.progress.gameActionCount>=state.progress.nextIncidentAt?triggerIncident(state,randomFn):null;
+export const checkEnvironmentEvent=checkIncident;
+export function getEffectiveGameStaminaCost(stall,environment){if(stall.type!=="GAME")return stall.staminaCost;return Math.max(0,stall.staminaCost+(CONFIG.crowdStaminaModifiers[environment.crowdLevel]??0)+(CONFIG.temperatureStaminaModifiers[environment.temperatureLevel]??0));}
+export const getEffectiveFoodPrice=(stall,environment)=>Math.round(stall.price*(CONFIG.priceMultipliers[environment.priceLevel]??1));
+export function getTemperatureFoodBonus(type,level){if(type==="HOT")return level===1?10:level===2?5:0;if(type==="COLD")return level===5?10:level===4?5:0;return 0;}
+export function applyRewardModifier(result,environment){const adjusted={...result};if(adjusted.moneyDelta>0)adjusted.moneyDelta=Math.round(adjusted.moneyDelta*(CONFIG.rewardMultipliers[environment.rewardLevel]??1));return adjusted;}

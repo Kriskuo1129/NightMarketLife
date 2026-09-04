@@ -1,5 +1,5 @@
 // Phase 1 Temporary Balance: revisit thresholds when integrating the real games.
-export const ACHIEVEMENT_THRESHOLDS = Object.freeze({ games: 3, manyGames: 8, foods: 3, usualVisits: 3, rainActions: 2, mosquitoActions: 3, homeStamina: 50, homeMoney: 500 });
+export const ACHIEVEMENT_THRESHOLDS = Object.freeze({ games: 3, manyGames: 8, foods: 3, usualVisits: 3, incidents: 3, homeStamina: 50, homeMoney: 500 });
 export const ACHIEVEMENT_CONFIG = Object.freeze([
   ["COME_ALL_THE_WAY", "來都來了", "都走到攤位前面了，不玩一下說不過去吧。"],
   ["CANT_STOP", "欲罷不能", "說好最後一次，通常都不是最後一次。"],
@@ -11,9 +11,9 @@ export const ACHIEVEMENT_CONFIG = Object.freeze([
   ["BROKE", "身無分文", "翻遍所有口袋，真的什麼都沒有。"],
   ["ROCK_BOTTOM", "山窮水盡", "沒力、沒錢，但至少人還在夜市。"],
   ["COMEBACK", "東山再起", "一口下去，又覺得自己可以了。"],
-  ["WALK_IN_RAIN", "雨中漫步", "別人在躲雨，你還在逛。"],
-  ["HUMAN_MOSQUITO_COIL", "人體蚊香", "今晚最飽的可能不是你。"],
-  ["WHO_IS_THAT", "那到底誰", "大家都在看，你到最後還是不知道他是誰。"],
+  ["INCIDENT_WITNESS", "見怪不怪", "夜市變了又變，你還是繼續逛。"],
+  ["HOT_NIGHT", "熱到發亮", "今晚的熱氣連燈籠都快受不了。"],
+  ["BUSINESS_BOOM", "生意興隆", "今晚每個老闆都忙得笑呵呵。"],
   ["TRY_EVERYTHING", "雨露均霑", "吃的、玩的，一攤都不能少。"],
   ["STILL_WANT_MORE", "意猶未盡", "明明還能繼續，你居然真的回家了。"],
   ["EMPTY_POCKETS", "兩袖清風", "今天帶回家的，主要是回憶。"],
@@ -24,11 +24,11 @@ export function createAchievement({ id, name, description }) {
   return { id, name, description, unlocked: false };
 }
 export const createInitialAchievements = () => ACHIEVEMENT_CONFIG.map(createAchievement);
-export const createAchievementTracking = () => ({ staminaZero: false, moneyZero: false, bothZero: false, foodRecovery: false, foodClosure: false, rainActions: 0 });
+export const createAchievementTracking = () => ({ staminaZero: false, moneyZero: false, bothZero: false, foodRecovery: false, foodClosure: false });
 
 // Successful action/commit/confirmed-home boundaries only; never called by render.
 // Only achievements and their minimal per-run history may be mutated here.
-export function evaluateAchievements(state, { before, raining = false, foodAction = false, foodClosed = false, settlement = false } = {}) {
+export function evaluateAchievements(state, { before, foodAction = false, foodClosed = false, settlement = false } = {}) {
   const { player: p, statistics: s, session } = state;
   const t = session.achievementTracking;
   const limits = ACHIEVEMENT_THRESHOLDS;
@@ -36,7 +36,6 @@ export function evaluateAchievements(state, { before, raining = false, foodActio
     t.staminaZero ||= before.stamina > 0 && p.stamina === 0;
     t.moneyZero ||= before.money > 0 && p.money === 0;
     t.bothZero ||= p.stamina === 0 && p.money === 0;
-    if (raining) t.rainActions += 1;
   }
   t.foodRecovery ||= foodAction && t.staminaZero && p.stamina > 0;
   t.foodClosure ||= foodClosed;
@@ -53,9 +52,9 @@ export function evaluateAchievements(state, { before, raining = false, foodActio
     BROKE: t.moneyZero,
     ROCK_BOTTOM: t.bothZero,
     COMEBACK: t.foodRecovery,
-    WALK_IN_RAIN: t.rainActions >= limits.rainActions,
-    HUMAN_MOSQUITO_COIL: s.mosquitoActions >= limits.mosquitoActions,
-    WHO_IS_THAT: s.eventHistory.some(event => event.eventId === "INFLUENCER"),
+    INCIDENT_WITNESS: s.incidentHistory.length >= limits.incidents,
+    HOT_NIGHT: s.incidentHistory.some(event => event.eventId === "TEMPERATURE_UP" && event.details.after === 5),
+    BUSINESS_BOOM: s.incidentHistory.some(event => event.eventId === "BUSINESS_UP" && event.details.after === 5),
     TRY_EVERYTHING: ordinary.length > 0 && ordinary.every(stall => (s.stallVisits[stall.id] ?? 0) > 0),
     STILL_WANT_MORE: settlement && p.stamina >= limits.homeStamina && p.money >= limits.homeMoney,
     EMPTY_POCKETS: settlement && p.money === 0,
