@@ -21,7 +21,7 @@ export function createGameState(characterSettings = {}) {
     activeEvents: createActiveEvents(),
     statistics: createStatistics(),
     achievements: createInitialAchievements(),
-    session: { scene: "HOME", startingMoney: null, buildId: null, nightConditionId: null, lastActivitySourceId: null, selectedStallId: stalls[0]?.id ?? null, presentation: null, presentationQueue: [], pendingIncident: null, endReason: null, achievementTracking: createAchievementTracking() }
+    session: { scene: "HOME", integrationSessionId: null, startingMoney: null, buildId: null, nightConditionId: null, lastActivitySourceId: null, selectedStallId: stalls[0]?.id ?? null, presentation: null, presentationQueue: [], pendingIncident: null, pendingExternalGame: null, lastConsumedResultId: null, endReason: null, achievementTracking: createAchievementTracking() }
   };
 }
 

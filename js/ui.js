@@ -6,6 +6,7 @@ import { getStallDisplayStatus } from "./stalls.js";
 import { getEffectiveFoodPrice, getEffectiveGameStaminaCost } from "./events.js";
 import { isInteractionLocked } from "./gameplay.js";
 import { getNightConditionById } from "./openings.js";
+import { loadSession } from "./session-persistence.js";
 
 export const SCENES = Object.freeze({ HOME: "HOME", CHARACTER_SETUP: "CHARACTER_SETUP", NIGHT_REVEAL: "NIGHT_REVEAL", NIGHT_MARKET: "NIGHT_MARKET", RESULT: "RESULT" });
 
@@ -22,6 +23,7 @@ export function render(gameState) {
   document.querySelectorAll("[data-scene]").forEach((element) => {
     element.hidden = element.dataset.scene !== gameState.session.scene;
   });
+  renderSessionRecovery(gameState);
   const values = {
     name: getPlayerDisplayName(gameState.player),
     stamina: `${gameState.player.stamina} / ${gameState.player.maxStamina}`,
@@ -59,6 +61,16 @@ export function render(gameState) {
   renderResult(gameState);
   const nameInput = document.querySelector("#player-name");
   if (nameInput && document.activeElement !== nameInput) nameInput.value = gameState.player.name;
+}
+
+function renderSessionRecovery(gameState) {
+  const panel=document.querySelector("[data-session-recovery]"); if(!panel)return;
+  const loaded=loadSession(),onHome=gameState.session.scene===SCENES.HOME;
+  const isCurrent=loaded.status==="valid"&&loaded.capsule.sessionId===gameState.session.integrationSessionId;
+  panel.hidden=!onHome||loaded.status==="empty"||isCurrent;
+  const message=panel.querySelector("[data-session-recovery-message]");
+  if(message)message.textContent=loaded.status==="corrupt"?"上次的夜市紀錄似乎壞掉了。":"今晚還沒逛完";
+  const resume=panel.querySelector('[data-action="continue-session"]');if(resume)resume.hidden=loaded.status!=="valid";
 }
 
 export function renderResult(gameState) {

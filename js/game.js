@@ -12,6 +12,10 @@ import { evaluateAchievements } from "./achievements.js";
 import { applyNightCondition, pickNightCondition } from "./openings.js";
 import { getResourceZeroWarning, getStallActivity, isInteractionLocked, predictStallAction, projectResources } from "./gameplay.js";
 import { checkIncident, commitPendingIncident, getEffectiveFoodPrice, getEffectiveGameStaminaCost, triggerIncident } from "./events.js";
+import { clearSession, createSessionId, loadSession, restoreSession, saveSession } from "./session-persistence.js";
+
+let storedRunStatus = loadSession();
+export const getStoredRunStatus = () => storedRunStatus;
 
 export function normalizeActivityResult(result = {}) {
   return {
@@ -43,6 +47,7 @@ export function applyActivityResult(result, { deferNotification = false, trackSt
   const resourceWarning = getResourceZeroWarning(before, player);
   if (resourceWarning && !deferNotification) enqueuePresentation(resourceWarning);
   render(gameState);
+  if (gameState.session.integrationSessionId) saveSession(gameState);
   return { ...activity, resourceWarning, appliedDeltas: {
     staminaDelta: player.stamina - before.stamina,
     moneyDelta: player.money - before.money
@@ -118,6 +123,7 @@ export function acknowledgeEnvironmentEvent(expected = gameState.session.present
   if (!commitPendingIncident(gameState, expected.pendingIncident)) return false;
   evaluateAchievements(gameState);
   gameState.session.presentation = null;
+  saveSession(gameState);
   return advancePresentation();
 }
 
@@ -126,6 +132,7 @@ export function requestEndGame(reason) {
   gameState.session.endReason = reason;
   evaluateAchievements(gameState, { settlement: true });
   changeScene(gameState, SCENES.RESULT);
+  saveSession(gameState);
   return true;
 }
 
@@ -158,6 +165,7 @@ function completeStallAction(stall, activity, randomFn) {
   showActivityResultPresentation(stall, activity);
   presentEvent(event);
   if (activity.resourceWarning) enqueuePresentation(activity.resourceWarning);
+  saveSession(gameState);
   render(gameState);
 }
 
@@ -213,15 +221,19 @@ export function buyFood(stallId, randomFn = Math.random) {
 }
 
 export function createNewGame(characterSettings = loadCharacterSettings() ?? {}, randomFn = Math.random) {
+  const stored = loadSession();
+  if (stored.status === "valid" && stored.capsule.sessionId !== gameState.session.integrationSessionId) { storedRunStatus = stored; render(gameState); return false; }
   document.querySelector("#management-office-dialog")?.close();
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   activityPresentationTimer = null;
   const build = pickRandomBuild(randomFn);
   resetGameState({ ...characterSettings, buildId: build.id });
+  gameState.session.integrationSessionId = createSessionId();
   gameState.session.buildId = build.id;
   gameState.session.startingMoney = gameState.player.money;
   initializeNightCondition(randomFn);
   changeScene(gameState, SCENES.NIGHT_REVEAL);
+  saveSession(gameState); storedRunStatus = loadSession();
   resetNightMarketScroll();
   return gameState;
 }
@@ -232,12 +244,15 @@ function resetNightMarketScroll() {
 }
 
 export function startNightMarketFromHome(name = "", randomFn = Math.random) {
+  const stored = loadSession();
+  if (stored.status === "valid" && stored.capsule.sessionId !== gameState.session.integrationSessionId) { storedRunStatus = stored; setAvatarStatus("今晚還沒逛完，可以先繼續上一晚或放棄紀錄。"); render(gameState); return false; }
   document.querySelector("#management-office-dialog")?.close();
   const legacyAppearance = loadCharacterSettings() ?? {};
   if (activityPresentationTimer !== null) clearTimeout(activityPresentationTimer);
   activityPresentationTimer = null;
   const build = pickRandomBuild(randomFn);
   resetGameState({ ...legacyAppearance, name, buildId: build.id });
+  gameState.session.integrationSessionId = createSessionId();
   gameState.session.buildId = build.id;
   gameState.session.startingMoney = gameState.player.money;
   const saved = saveCharacterSettings(gameState.player);
@@ -249,6 +264,7 @@ export function startNightMarketFromHome(name = "", randomFn = Math.random) {
   setStatus("");
   initializeNightCondition(randomFn);
   changeScene(gameState, SCENES.NIGHT_REVEAL);
+  saveSession(gameState); storedRunStatus = loadSession();
   resetNightMarketScroll();
   return gameState;
 }
@@ -263,7 +279,20 @@ function initializeNightCondition(randomFn) {
 export function acknowledgeOpening(expectedId = gameState.session.nightConditionId) {
   if (gameState.session.scene !== SCENES.NIGHT_REVEAL || expectedId !== gameState.session.nightConditionId) return false;
   changeScene(gameState, SCENES.NIGHT_MARKET);
+  saveSession(gameState);
   return true;
+}
+
+export function continueStoredSession() {
+  const loaded = loadSession();
+  if (loaded.status !== "valid" || !restoreSession(gameState, loaded.capsule, loadCharacterSettings() ?? {})) { storedRunStatus = { status: "corrupt", capsule: null }; render(gameState); return false; }
+  storedRunStatus = loaded; setAvatarStatus(""); render(gameState); return true;
+}
+
+export function abandonStoredSession() {
+  clearSession(); storedRunStatus = { status: "empty", capsule: null };
+  if (gameState.session.scene !== SCENES.HOME) resetGameState(loadCharacterSettings() ?? {});
+  setAvatarStatus(""); render(gameState); return true;
 }
 
 function setAvatarStatus(message = "") {
@@ -285,6 +314,8 @@ function bindUI() {
     const button = event.target.closest("button");
     if (!button) return;
     if (button.dataset.action === "acknowledge-opening") { acknowledgeOpening(); return; }
+    if (button.dataset.action === "continue-session") { continueStoredSession(); return; }
+    if (button.dataset.action === "abandon-session") { abandonStoredSession(); return; }
     if (button.dataset.action === "acknowledge-event") { acknowledgeEnvironmentEvent(); return; }
     if (button.dataset.action === "acknowledge-resource") { acknowledgeResourceWarning(); return; }
     if (isInteractionLocked(gameState) && gameState.session.scene === SCENES.NIGHT_MARKET) return;
@@ -426,6 +457,7 @@ export function setStallClosed(stallId, isClosed) {
   const stall = gameState.stalls.find((item) => item.id === stallId);
   if (!stall) return false;
   stall.isClosed = Boolean(isClosed);
+  if (gameState.session.integrationSessionId) saveSession(gameState);
   render(gameState);
   return true;
 }
@@ -433,6 +465,7 @@ export function setStallClosed(stallId, isClosed) {
 export function setEnvironmentLevel(key, level) {
   if (!["crowdLevel","priceLevel","rewardLevel","temperatureLevel","businessLevel"].includes(key)) return false;
   gameState.environment[key] = Math.min(5, Math.max(1, Number(level)));
+  if (gameState.session.integrationSessionId) saveSession(gameState);
   render(gameState); return true;
 }
 export function completeCharacterSetup() {
@@ -455,6 +488,7 @@ export function completeCharacterSetup() {
 
 export function initializeGame() {
   resetGameState(loadCharacterSettings() ?? {});
+  storedRunStatus = loadSession();
   bindUI();
   render(gameState);
   return gameState;
@@ -468,6 +502,9 @@ window.NMLDebug = Object.freeze({
   getCharacterAssets: () => ({ faces: FACE_ASSETS, defaultClothes: DEFAULT_CLOTHES, shopClothes: SHOP_CLOTHES }),
   getCharacterSettings: loadCharacterSettings,
   clearCharacterSettings,
+  getRunSession: () => loadSession(),
+  continueRunSession: continueStoredSession,
+  abandonRunSession: abandonStoredSession,
   applyActivityResult,
   handleExternalGameResult,
   playTestGame,

@@ -21,6 +21,7 @@ h1,h2,p { overflow-wrap:anywhere; } h1 { margin:0; font-size:clamp(2.65rem,13vw,
 .home-scene { padding:clamp(1rem,4vw,1.5rem); border-radius:.4rem; background:linear-gradient(180deg,#2a1915f5,#1d1210f5); box-shadow:0 .8rem 2.5rem #0006; }
 .home-build-picker { display:grid; gap:.3rem; width:100%; padding:.65rem .8rem; text-align:left; color:var(--nml-text); border:1px solid var(--nml-border); border-radius:.5rem; background:var(--nml-surface-dark); overflow-wrap:anywhere; }
 .reveal-scene{min-height:100dvh;display:flex;flex-direction:column;justify-content:center;gap:1rem;padding:1.25rem;text-align:center}.reveal-scene[hidden]{display:none}.reveal-card{padding:1.2rem;border:1px solid var(--nml-border);border-radius:1rem;background:var(--nml-surface-dark);box-shadow:0 .75rem 2rem #0005}.reveal-card h3{margin:0 0 .65rem;color:var(--nml-gold);font-size:clamp(1.4rem,7vw,2rem)}.reveal-card p{margin:0;line-height:1.7}.reveal-scene>.primary-button{width:100%;margin-top:.5rem}
+.session-recovery{padding:.8rem;border:1px solid var(--nml-gold);border-radius:.75rem;background:#3a271f;text-align:center}.session-recovery[hidden]{display:none}.session-recovery>div{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.65rem}.session-recovery button{min-width:0}
 .home-build-picker>span:first-child,.home-build-picker small { color:var(--nml-muted); }
 .home-build-picker strong { color:var(--nml-gold); }
 .home-build-picker:hover { border-color:var(--nml-orange); }
