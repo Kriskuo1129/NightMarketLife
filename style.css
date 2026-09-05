@@ -6,7 +6,7 @@
 #environment-event-dialog { overflow-wrap:anywhere; }
 #environment-event-dialog [data-event-effects] { white-space:pre-line; }
 #environment-event-dialog .primary-button { width:100%; min-height:44px; }
-#resource-warning-dialog, #stall-detail-dialog { max-height:calc(100dvh - 2rem); overflow-y:auto; overflow-wrap:anywhere; }
+#resource-warning-dialog, #stall-detail-dialog, #integration-recovery-dialog { max-height:calc(100dvh - 2rem); overflow-y:auto; overflow-wrap:anywhere; }
 #resource-warning-dialog .primary-button { width:100%; min-height:44px; }
 #resource-warning-dialog [data-resource-effects] { white-space:pre-line; }
 .stall-card:disabled { cursor:wait; }

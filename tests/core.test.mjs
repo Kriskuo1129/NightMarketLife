@@ -7,7 +7,8 @@ const {NIGHT_CONDITION_CONFIG,applyNightCondition}=await import("../js/openings.
 const {createEnvironment,getEffectiveGameStaminaCost,getEffectiveFoodPrice,getTemperatureFoodBonus,applyRewardModifier,prepareIncident,commitPendingIncident,getEligibleIncidents}=await import("../js/events.js");
 const {createInitialStalls,initializeStallLife,consumeStallLife,FOOD_CONFIG,STALL_TYPES,TEST_GAME_RESULTS}=await import("../js/stalls.js");
 const {gameState}=await import("../js/state.js");
-const {createNewGame,acknowledgeOpening,playTestGame,buyFood,clearActivityResultPresentation,advancePresentation,applyActivityResult}=await import("../js/game.js");
+const {createNewGame,acknowledgeOpening,playTestGame,buyFood,clearActivityResultPresentation,advancePresentation,applyActivityResult,abandonStoredSession}=await import("../js/game.js");
+const {ACTIVE_GAME_KEY,GAME_RESULT_KEY}=await import("../js/integration-host.js");
 const builds=CONFIG.characterBuilds;
 assert.deepEqual(builds.map(b=>[b.name,b.stamina,b.money]),[["高中生",120,600],["大學生",110,800],["社會人",100,1000],["中年人",85,1300],["老年人",70,1600]]);
 assert.deepEqual([0,.2,.4,.6,.8].map(n=>pickRandomBuild(()=>n).id),builds.map(b=>b.id));
@@ -24,7 +25,7 @@ assert.equal(getTemperatureFoodBonus("HOT",1),10);assert.equal(getTemperatureFoo
 assert.deepEqual(applyRewardModifier({moneyDelta:100},{rewardLevel:5}),{moneyDelta:150});assert.deepEqual(applyRewardModifier({moneyDelta:-100},{rewardLevel:5}),{moneyDelta:-100});
 for(const [level,range] of [[1,[3,3]],[2,[3,4]],[3,[4,5]],[4,[5,6]],[5,[6,6]]]){initializeStallLife(stalls,level,()=>.99);for(const s of stalls.filter(x=>!x.isSpecial))assert.ok(s.life>=range[0]&&s.life<=range[1]);}
 const specialLife=special.life;consumeStallLife(special);assert.equal(special.life,specialLife);
-createNewGame({},()=>0);assert.equal(gameState.session.scene,"NIGHT_REVEAL");assert.equal(gameState.player.buildId,"high-school");assert.equal(gameState.session.nightConditionId,"NORMAL_NIGHT");assert.equal(gameState.session.startingMoney,600);assert.equal(acknowledgeOpening(),true);assert.equal(gameState.session.scene,"NIGHT_MARKET");
+localStorage.setItem(ACTIVE_GAME_KEY,"stale");localStorage.setItem(GAME_RESULT_KEY,"stale");localStorage.setItem("nightMarketLife.characterSettings.v1",JSON.stringify({name:"保留"}));createNewGame({},()=>0);assert.equal(localStorage.getItem(ACTIVE_GAME_KEY),null);assert.equal(localStorage.getItem(GAME_RESULT_KEY),null);assert.ok(localStorage.getItem("nightMarketLife.characterSettings.v1"));assert.equal(gameState.session.scene,"NIGHT_REVEAL");assert.equal(gameState.player.buildId,"high-school");assert.equal(gameState.session.nightConditionId,"NORMAL_NIGHT");assert.equal(gameState.session.startingMoney,600);assert.equal(acknowledgeOpening(),true);assert.equal(gameState.session.scene,"NIGHT_MARKET");
 gameState.progress.nextIncidentAt=2;let life=gameState.stalls.find(s=>s.id==="game_01").life;playTestGame("game_01",()=>0);clearActivityResultPresentation();assert.equal(gameState.progress.gameActionCount,1);assert.equal(gameState.stalls.find(s=>s.id==="game_01").life,life-1);
 const foodStall=gameState.stalls.find(s=>s.id==="food_01");life=foodStall.life;const count=gameState.progress.gameActionCount;buyFood("food_01",()=>0);clearActivityResultPresentation();assert.equal(foodStall.life,life-1);assert.equal(gameState.progress.gameActionCount,count);assert.equal(gameState.session.pendingIncident,null);
 playTestGame("game_02",()=>0);assert.equal(gameState.progress.gameActionCount,2);assert.ok(gameState.session.pendingIncident);assert.equal(gameState.progress.nextIncidentAt,2);advancePresentation(gameState.session.presentation);assert.equal(gameState.session.presentation.type,"INCIDENT_MODAL");const incident=gameState.session.pendingIncident;commitPendingIncident(gameState,incident,()=>0);assert.equal(gameState.progress.nextIncidentAt,4);assert.equal(gameState.statistics.incidentHistory.length,1);
@@ -34,4 +35,5 @@ gameState.player.stamina=0;gameState.player.money=0;for(const s of gameState.sta
 assert.equal(gameState.achievements.length,17);assert.ok(Object.hasOwn(gameState.statistics,"stallMoneyFlow"));
 const html=readFileSync(new URL("../index.html",import.meta.url),"utf8");assert.doesNotMatch(html,/data-home-build|home-build-dialog|分數|Score/i);assert.equal((html.match(/data-player="(?:stamina|money)"/g)||[]).length>=2,true);
 assert.equal(Object.hasOwn(applyActivityResult({scoreDelta:99,completed:false}),"scoreDelta"),false);
+localStorage.setItem(ACTIVE_GAME_KEY,"stale");localStorage.setItem(GAME_RESULT_KEY,"stale");const settingsBefore=localStorage.getItem("nightMarketLife.characterSettings.v1");abandonStoredSession();assert.equal(localStorage.getItem(ACTIVE_GAME_KEY),null);assert.equal(localStorage.getItem(GAME_RESULT_KEY),null);assert.equal(localStorage.getItem("nightMarketLife.characterSettings.v1"),settingsBefore);
 console.log("NightMarketLife Step 8.1 core tests: PASS");

@@ -4,6 +4,7 @@ import { STALL_CONFIG } from "./stalls.js";
 import { createGameState } from "./state.js";
 import { INCIDENT_MESSAGES, getIncidentUI } from "./events.js";
 import { getNightConditionById } from "./openings.js";
+import { validatePendingExternalGame } from "./integration-host.js";
 
 export const SESSION_VERSION = 1;
 export const RUN_SESSION_KEY = "nightMarketLife.session.active.v1";
@@ -36,8 +37,8 @@ export function buildSessionCapsule(state, now = () => new Date()) {
     achievements: state.achievements.map(({ id, unlocked }) => ({ id, unlocked })),
     achievementTracking: structuredClone(state.session.achievementTracking),
     pendingIncident: state.session.pendingIncident ? { eventId: state.session.pendingIncident.eventId, gameActionCount: state.session.pendingIncident.gameActionCount, details: structuredClone(state.session.pendingIncident.details), projected: structuredClone(state.session.pendingIncident.projected) } : null,
-    pendingExternalGame: null,
-    lastConsumedResultId: null
+    pendingExternalGame: state.session.pendingExternalGame ? structuredClone(state.session.pendingExternalGame) : null,
+    lastConsumedResultId: state.session.lastConsumedResultId
   };
 }
 
@@ -59,7 +60,8 @@ export function validateSessionCapsule(value) {
   const trackingKeys=["staminaZero","moneyZero","bothZero","foodRecovery","foodClosure"];
   if (!isObject(value.achievementTracking)||Object.keys(value.achievementTracking).length!==trackingKeys.length||!trackingKeys.every(key=>typeof value.achievementTracking[key]==="boolean")) return false;
   if(value.pendingIncident!==null&&(!isObject(value.pendingIncident)||!Object.hasOwn(INCIDENT_MESSAGES,value.pendingIncident.eventId)||!Number.isInteger(value.pendingIncident.gameActionCount)||!isObject(value.pendingIncident.details)||!isObject(value.pendingIncident.projected)))return false;
-  return value.pendingExternalGame === null && value.lastConsumedResultId === null;
+  if (value.pendingExternalGame !== null && !validatePendingExternalGame(value.pendingExternalGame)) return false;
+  return value.lastConsumedResultId === null || (typeof value.lastConsumedResultId === "string" && value.lastConsumedResultId.trim().length > 0);
 }
 
 export function saveSession(state, storage = localStorage) {
@@ -82,6 +84,6 @@ export function restoreSession(target,capsule,characterSettings={}) {
   clean.progress=structuredClone(capsule.progress); clean.statistics=structuredClone(capsule.statistics);
   const unlocked=new Map(capsule.achievements.map(item=>[item.id,item.unlocked])); clean.achievements.forEach(item=>item.unlocked=unlocked.get(item.id));
   const pending=capsule.pendingIncident?{...structuredClone(capsule.pendingIncident)}:null;if(pending)pending.ui=getIncidentUI(pending);
-  Object.assign(clean.session,{scene:"NIGHT_MARKET",integrationSessionId:capsule.sessionId,nightConditionId:capsule.nightConditionId,startingMoney:capsule.startingMoney,achievementTracking:structuredClone(capsule.achievementTracking),pendingExternalGame:null,lastConsumedResultId:null,presentation:pending?{type:"INCIDENT_MODAL",eventId:pending.eventId,pendingIncident:pending,...pending.ui}:null,presentationQueue:[],pendingIncident:pending,endReason:null});
+  Object.assign(clean.session,{scene:"NIGHT_MARKET",integrationSessionId:capsule.sessionId,nightConditionId:capsule.nightConditionId,startingMoney:capsule.startingMoney,achievementTracking:structuredClone(capsule.achievementTracking),pendingExternalGame:capsule.pendingExternalGame?structuredClone(capsule.pendingExternalGame):null,lastConsumedResultId:capsule.lastConsumedResultId,presentation:pending?{type:"INCIDENT_MODAL",eventId:pending.eventId,pendingIncident:pending,...pending.ui}:null,presentationQueue:[],pendingIncident:pending,endReason:null});
   for(const key of Object.keys(target))delete target[key];Object.assign(target,clean);return true;
 }
